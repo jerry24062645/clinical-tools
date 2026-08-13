@@ -1,18 +1,11 @@
-# Auto Clinical Lab v6.4.4
+# Auto Clinical Lab v6.4.6
 
-GitHub 直接覆蓋版。
+## 更新
+- `Capture screen` 改為 **Windows 剪取工具**。
+- 點擊後呼叫 Windows Snipping Tool (`ms-screenclip:`)。
+- 完成框選後回到 HIS 頁面按 **Ctrl+V**，圖片會直接貼入 Auto Clinical Lab 預覽。
+- 不再使用瀏覽器整個螢幕/視窗分享 API，避免誤截其他螢幕內容。
+- 保留 v6.4.5 的 CXR、PVR/ABI、Echo、InBody、lab 累積解析功能。
 
-## 這版修正
-- 不同「完報日」依日期累積，不互相覆蓋；最新日期在最上方。
-- 同一天同一檢驗去重；OneTouch 血糖保留同日不同時間的 trend。
-- 擴充 CBC differential、ABG/VBG、Blood ketone、CRP/PCT/Lactate/D-dimer、Na/K/Cl/Ca/P/Mg、bilirubin/albumin、amylase/lipase、stool、Urine TP、TFT、lipid。
-- 保留 Urine Routine、UACR mg/g、Echo、InBody、H/L 空格、Clear cache、Capture screen。
-
-## 上傳 GitHub
-將 ZIP 解壓縮後，把以下同名檔案直接覆蓋原本 GitHub 檔案即可：
-- `emr_lab_bookmarklet.html`
-- `bookmarklet_source.js`
-- `screen_capture.html`
-- `README.md`
-
-> 臨床使用前仍請與原始報告核對數值、單位與日期。
+## GitHub 更新
+解壓縮後，將同名檔案直接覆蓋 GitHub 原檔即可。
