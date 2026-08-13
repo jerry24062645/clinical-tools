@@ -1,21 +1,21 @@
 (()=>{
-const ID='__acl645r', KEY='__acl645rcache';
+const ID='__acl644', KEY='__acl644cache';
 if(document.getElementById(ID)){document.getElementById(ID).remove();return}
 let S={byDate:{},mode:'AUTO'};try{S={...S,...JSON.parse(sessionStorage.getItem(KEY)||'{}')}}catch(e){}
 if(!S.byDate||typeof S.byDate!=='object')S.byDate={};
 const save=()=>sessionStorage.setItem(KEY,JSON.stringify(S));
-const txt=()=>{const c=document.body?.cloneNode(true);if(!c)return '';c.querySelector('#'+ID)?.remove();return c.innerText||''};
+const txt=()=>document.body?.innerText||'';
 const clean=s=>String(s||'').replace(/\s+/g,' ').trim();
-function rows(){return [...document.querySelectorAll('tr')].filter(tr=>!tr.closest('#'+ID)).map(tr=>[...tr.querySelectorAll('th,td')].map(td=>clean(td.innerText))).filter(r=>r.length>=4)}
+function rows(){return [...document.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('th,td')].map(td=>clean(td.innerText))).filter(r=>r.length>=4)}
 const dateRe=/(\d{2,3}\/\d{2}\/\d{2})/;
 const timeRe=/\b([01]?\d|2[0-3]):[0-5]\d\b/;
 function rowDate(r){for(const c of r){const m=c.match(dateRe);if(m)return m[1]}return null}
 function rowTime(r){for(const c of r){const m=c.match(timeRe);if(m)return m[0]}return ''}
 function ensureDate(date){
   if(!date)return null;
-  if(!S.byDate[date])S.byDate[date]={labs:{},urine:{},bloodGas:{},cbcDiff:{},series:{poc:[]},stool:{},special:{},echo:{},inbody:{},cxr:{},pvr:{}};
+  if(!S.byDate[date])S.byDate[date]={labs:{},urine:{},bloodGas:{},cbcDiff:{},series:{poc:[]},stool:{},special:{},echo:{},inbody:{},vascular:{}};
   const g=S.byDate[date];
-  g.labs||={};g.urine||={};g.bloodGas||={};g.cbcDiff||={};g.series||={poc:[]};g.series.poc||=[];g.stool||={};g.special||={};g.echo||={};g.inbody||={};g.cxr||={};g.pvr||={};
+  g.labs||={};g.urine||={};g.bloodGas||={};g.cbcDiff||={};g.series||={poc:[]};g.series.poc||=[];g.stool||={};g.special||={};g.echo||={};g.inbody||={};g.vascular||={};
   return g;
 }
 function parseRef(after){
@@ -41,10 +41,6 @@ function textValueAfter(r,ni){for(let i=ni+1;i<r.length;i++){const v=clean(r[i])
 function reportDate(kind,t){
  const rr=rows(); const re=kind==='echo'?/echo|Doppler color flow mapping|心臟血流圖/i:/身體組成分析|InBody|BCM-1/i;
  for(const r of rr){if(re.test(r.join(' '))){const d=rowDate(r);if(d)return d}}
- const m=t.match(dateRe);return m?m[1]:null;
-}
-function reportDateBy(re,t){
- for(const r of rows()){if(re.test(r.join(' '))){const d=rowDate(r);if(d)return d}}
  const m=t.match(dateRe);return m?m[1]:null;
 }
 const aliases={
@@ -133,51 +129,40 @@ function parseSpecialText(){
 }
 function parseEcho(t){if(!/echo|M-MODE|DOPPLAER|DOPPLER|LVEF|diastolic function/i.test(t))return;const date=reportDate('echo',t);if(!date)return;const E=ensureDate(date).echo;let m;if(m=t.match(/LVEF\s*(?:about)?\s*(\d+(?:\.\d+)?)\s*%/i))E.lvef=m[1];if(/left ventricular hypertrophy|\bLVH\b/i.test(t))E.lvh=true;if(/preserved LV systolic|normal LV systolic function/i.test(t))E.sys='preserved LV systolic function';if(/normal diastolic function|Suggestive normal diastolic function/i.test(t))E.dia='normal LV diastolic function';for(const sev of ['trivial','mild','moderate','severe']){let re=new RegExp(sev+'\\s+([^\\n.]{0,60}(?:MR|TR|PR)[^\\n.]*)','ig');while(m=re.exec(t)){for(const v of ['MR','PR','TR'])if(new RegExp('\\b'+v+'\\b','i').test(m[1]))E[v]=sev}}if(m=t.match(/estimated PASP\s*(?:about)?\s*(\d+(?:\.\d+)?)\s*mmHg/i))E.pasp=m[1];save()}
 function parseInbody(t){if(!/身體組成分析|InBody|PBF|體脂肪率/i.test(t))return;const date=reportDate('inbody',t);if(!date)return;const I=ensureDate(date).inbody;const pats={BW:/(?:體重|BW)\s*[:：]?\s*(\d+(?:\.\d+)?)/i,BMI:/\bBMI\s*[:：]?\s*(\d+(?:\.\d+)?)/i,PBF:/(?:PBF|體脂肪率)\s*(?:\(%\))?\s*[:：]?\s*(\d+(?:\.\d+)?)/i,BFM:/(?:BFM|體脂肪量)\s*[:：]?\s*(\d+(?:\.\d+)?)/i,SMM:/(?:SMM|肌肉量)\s*[:：]?\s*(\d+(?:\.\d+)?)/i,VFA:/(?:VFA|內臟脂肪指數)\s*[:：]?\s*(\d+(?:\.\d+)?)/i};for(const[k,re]of Object.entries(pats)){const m=t.match(re);if(m)I[k]=m[1]}save()}
-function parseCXR(t){
- const head=/胸部檢查第一張|Chest\s*(?:X-?ray|radiograph)|\bCXR\b/i;
- if(!head.test(t))return;
- const date=reportDateBy(head,t);if(!date)return;
- const C=ensureDate(date).cxr;
- const lines=t.split(/\n+/).map(x=>clean(x)).filter(Boolean);
- const findings=[];
- for(const line of lines){
-   if(/ground-glass lesion.*might be missed|plain chest radiography|Note that ground-glass/i.test(line))continue;
-   if(/^[-•]\s*/.test(line)){
-     const z=line.replace(/^[-•]\s*/, '').trim();
-     if(z && !/^(?:報告內容|診療項目|Auto Clinical Lab|CXR:)/i.test(z) && !/^[#|_\-]+$/.test(z))findings.push(z.replace(/\s+/g,' '));
+function parseVascular(t){
+ if(!/心內動脈分段血流及壓力之測定|四肢血流探測\s*[,，]?\s*壓力測量並記錄|Pulse\s*volume\s*recording|\bABI\b/i.test(t))return;
+ const rr=rows();let date=null;
+ for(const r of rr){if(/心內動脈分段血流及壓力之測定|四肢血流探測\s*[,，]?\s*壓力測量並記錄|Pulse\s*volume\s*recording/i.test(r.join(' '))){date=rowDate(r);if(date)break}}
+ if(!date){const m=t.match(dateRe);date=m&&m[1]}if(!date)return;
+ const V=ensureDate(date).vascular;
+ // Parse the visible report body by lines. HIS layout is: interpretation | right | left |
+ const ls=t.split(/\n+/).map(clean).filter(Boolean);
+ let section='';
+ for(const line of ls){
+   if(/^N\/?C arteries\b/i.test(line))section='nc';
+   else if(/^NORMAL\b/i.test(line))section='normal';
+   else if(/^ABNORMAL\b/i.test(line))section='abnormal';
+   const parts=line.split('|').map(clean);
+   if(parts.length>=3){
+     const label=parts[0], right=parts[1]||'', left=parts[2]||'';
+     if(/interpretation/i.test(label)){V.interpR=right;V.interpL=left}
+     else if(/N\/?C arteries/i.test(label)){V.ncR=right;V.ncL=left}
+     else if(/NORMAL/i.test(label)){V.normalR=right;V.normalL=left}
+     else if(/ABNORMAL/i.test(label)){V.abnormalR=right;V.abnormalL=left}
+     else if(/ABI\s*[≥>=]\s*1\.3/i.test(label)){V.ncR=V.ncR||right;V.ncL=V.ncL||left}
+     else if(/0\.9\s*[≤<].*ABI.*1\.3|0\.9.*ABI.*1\.3/i.test(label)){V.normalR=V.normalR||right;V.normalL=V.normalL||left}
+     else if(/ABI\s*<\s*0\.9/i.test(label)){V.abnormalR=V.abnormalR||right;V.abnormalL=V.abnormalL||left}
    }
  }
- if(!findings.length){
-   for(const pat of [/Increased interstitial marking[^\n.]*(?:\.|$)/i,/Spondylosis[^\n.]*(?:\.|$)/i,/S\/?P feeding tube insertion\.?/i,/cardiomegaly[^\n.]*(?:\.|$)/i,/pleural effusion[^\n.]*(?:\.|$)/i]){const m=t.match(pat);if(m)findings.push(clean(m[0]))}
- }
- if(findings.length)C.findings=[...new Set(findings)];
+ // Fallback: collect ABI-looking numeric values in report text if table separators were flattened.
+ const nums=[...t.matchAll(/(?:^|\s|\|)(\d\.\d{1,2})(?=\s|\||$)/gm)].map(m=>m[1]).filter(x=>{const n=+x;return n>=0.2&&n<=2.0});
+ if(!V.normalR&&!V.normalL&&!V.abnormalR&&!V.abnormalL&&nums.length){V.values=[...new Set(nums)].slice(0,4)}
  save();
 }
-function parsePVR(t){
- const head=/心內動脈分段血流及壓力之測定\s*PUR|Pulse\s*volume\s*recording|四肢血流探測\s*[,，]?\s*壓力測量並記錄/i;
- if(!head.test(t))return;
- const date=reportDateBy(head,t);if(!date)return;
- const P=ensureDate(date).pvr;
- const lines=t.split(/\n+/).map(x=>clean(x)).filter(Boolean);
- for(const line of lines){
-   let m=line.match(/^NORMAL\s*\|\s*(\d+(?:\.\d+)?)\s*\|\s*(\d+(?:\.\d+)?)?\s*\|?/i);
-   if(m){if(m[1]){P.R=m[1];P.Rstatus='normal'}if(m[2]){P.L=m[2];P.Lstatus='normal'};continue}
-   m=line.match(/^ABNORMAL\s*\|\s*(\d+(?:\.\d+)?)?\s*\|\s*(\d+(?:\.\d+)?)?\s*\|?/i);
-   if(m){if(m[1]){P.R=m[1];P.Rstatus='abnormal'}if(m[2]){P.L=m[2];P.Lstatus='abnormal'};continue}
-   m=line.match(/^N\/?C arteries\s*\|\s*(\d+(?:\.\d+)?)?\s*\|\s*(\d+(?:\.\d+)?)?/i);
-   if(m){if(m[1]){P.R=m[1];P.Rstatus='noncompressible'}if(m[2]){P.L=m[2];P.Lstatus='noncompressible'}}
- }
- // Common text fallbacks: Right ABI / Left ABI or ABI R/L.
- let m;if(!P.R&&(m=t.match(/(?:Right\s*ABI|ABI\s*R(?:ight)?)\s*[:=]?\s*(\d+(?:\.\d+)?)/i)))P.R=m[1];
- if(!P.L&&(m=t.match(/(?:Left\s*ABI|ABI\s*L(?:eft)?)\s*[:=]?\s*(\d+(?:\.\d+)?)/i)))P.L=m[1];
- if(!P.R){m=t.match(/NORMAL\s*\|\s*(\d+(?:\.\d+)?)/i);if(m){P.R=m[1];P.Rstatus='normal'}}
- if(!P.L){m=t.match(/ABNORMAL\s*\|(?:\s*\|)?\s*(\d+(?:\.\d+)?)\s*\|/i);if(m){P.L=m[1];P.Lstatus='abnormal'}}
- save();
-}
-function parseAll(){const t=txt();parseLabs();parseCBCDiff();parseUrine();parseBloodGas();parseSpecialText();parseEcho(t);parseInbody(t);parseCXR(t);parsePVR(t)}
+function parseAll(){parseLabs();parseCBCDiff();parseUrine();parseBloodGas();parseSpecialText();parseEcho(txt());parseInbody(txt());parseVascular(txt())}
 function v(L,k){return L[k]?.v}
 function formatGroup(g){
- const L=g.labs||{},U=g.urine||{},E=g.echo||{},I=g.inbody||{},CXR=g.cxr||{},PVR=g.pvr||{},D=g.cbcDiff||{},BG=g.bloodGas||{},SP=g.special||{},ST=g.stool||{},lines=[];let a=[];
+ const L=g.labs||{},U=g.urine||{},E=g.echo||{},I=g.inbody||{},V=g.vascular||{},D=g.cbcDiff||{},BG=g.bloodGas||{},SP=g.special||{},ST=g.stool||{},lines=[];let a=[];
  if(v(L,'hba1c')){let x=`HbA1c ${v(L,'hba1c')}%`;if(v(L,'eag'))x+=` (eAG ${v(L,'eag')} mg/dL)`;a.push(x)}if(v(L,'gluAC'))a.push(`Glu-AC ${v(L,'gluAC')} mg/dL`);else if(v(L,'gluPC'))a.push(`Glu-PC ${v(L,'gluPC')} mg/dL`);if(v(L,'uacr'))a.push(`UACR ${v(L,'uacr')} mg/g`);if(v(L,'upcr'))a.push(`UPCR ${v(L,'upcr')} mg/g`);if(a.length)lines.push('• '+a.join('; '));
  if(v(L,'wbc')||v(L,'hb')||v(L,'plt')||Object.keys(D).length){a=[];if(v(L,'wbc'))a.push(`WBC ${v(L,'wbc')}`);if(v(L,'hb'))a.push(`Hb ${v(L,'hb')}`);if(v(L,'plt'))a.push(`Plt ${v(L,'plt')}`);if(['neut','lymp','mono','eosi','baso'].every(k=>D[k]))a.push(`N/L/M/E/B ${D.neut}/${D.lymp}/${D.mono}/${D.eosi}/${D.baso}%`);lines.push('• CBC: '+a.join('; '))}
  a=[];let lip=['tc','tg','hdl','ldl'].filter(k=>v(L,k));if(lip.length)a.push(`${lip.map(k=>({tc:'TC',tg:'TG',hdl:'HDL',ldl:'LDL'}[k])).join('/')} ${lip.map(k=>v(L,k)).join('/')} mg/dL`);if(v(L,'ua'))a.push(`UA ${v(L,'ua')} mg/dL`);if(a.length)lines.push('• '+a.join('; '));
@@ -195,18 +180,16 @@ function formatGroup(g){
  if(ST.ob||ST.transferrin){a=[];if(ST.ob)a.push(`Stool OB ${ST.ob}`);if(ST.transferrin)a.push(`Stool transferrin ${ST.transferrin}`);lines.push('• '+a.join('; '))}
  if(Object.keys(E).length){a=[];if(E.lvh)a.push('LVH');if(E.lvef)a.push(`LVEF ${E.lvef}%`);if(E.sys)a.push(E.sys);if(E.dia)a.push(E.dia);for(const sev of ['trivial','mild','moderate','severe']){const vs=['MR','PR','TR'].filter(x=>E[x]===sev);if(vs.length)a.push(`${sev} ${vs.join('/')}`)}if(E.pasp)a.push(`PASP ${E.pasp} mmHg`);if(a.length)lines.push('• Echo: '+a.join('; '))}
  if(Object.keys(I).length){const p=[];for(const k of ['BW','BMI','PBF','BFM','SMM','VFA'])if(I[k])p.push(`${k} ${I[k]}${k==='PBF'?'%':''}`);if(p.length)lines.push('• InBody: '+p.join('; '))}
- if(CXR.findings?.length)lines.push('• CXR: '+CXR.findings.join('; '))
- if(PVR.R||PVR.L){a=[];if(PVR.R)a.push(`R ${PVR.R}${PVR.Rstatus&&PVR.Rstatus!=='normal'?` (${PVR.Rstatus})`:''}`);if(PVR.L)a.push(`L ${PVR.L}${PVR.Lstatus&&PVR.Lstatus!=='normal'?` (${PVR.Lstatus})`:''}`);if(a.length)lines.push('• ABI: '+a.join('; '))}
+ if(Object.keys(V).length){const p=[];if(V.interpR||V.interpL)p.push(`Interpretation R/L ${V.interpR||'-'}/${V.interpL||'-'}`);if(V.ncR||V.ncL)p.push(`N/C arteries R/L ${V.ncR||'-'}/${V.ncL||'-'}`);if(V.normalR||V.normalL)p.push(`ABI normal R/L ${V.normalR||'-'}/${V.normalL||'-'}`);if(V.abnormalR||V.abnormalL)p.push(`ABI abnormal R/L ${V.abnormalR||'-'}/${V.abnormalL||'-'}`);if(V.values?.length)p.push(`ABI ${V.values.join('/')}`);if(p.length)lines.push('• PVR/ABI: '+p.join('; '))}
  return lines;
 }
 function dateKey(d){const p=d.split('/').map(Number);return p[0]*10000+p[1]*100+p[2]}
 function fmt(){parseAll();const dates=Object.keys(S.byDate).filter(d=>formatGroup(S.byDate[d]).length).sort((a,b)=>dateKey(b)-dateKey(a));return dates.map(d=>`${d}\n${formatGroup(S.byDate[d]).join('\n')}`).join('\n\n')}
 const d=document.createElement('div');d.id=ID;d.style='position:fixed;z-index:2147483647;right:12px;top:12px;width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;background:#fff;color:#243746;border:1px solid #ccd3db;border-radius:14px;box-shadow:0 12px 40px #0004;padding:14px;font:14px Arial,sans-serif';
-d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.4.5</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">自動讀取並依完報日累積；新增 CXR、PVR/ABI。Windows 截圖：按「Windows 剪取工具」後用 Win+Shift+S 截圖，再回此頁 Ctrl+V。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
+d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.4.5</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。新增 CBC differential、ABG/VBG、OneTouch trend、CRP/PCT/Lactate、electrolytes、bilirubin/albumin、stool、blood ketone、amylase/lipase、Urine TP。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
 const R=d.querySelector('#aR'),D=d.querySelector('#aD');function draw(){const t=txt();const det=/\b住院\b/.test(t)?'IPD':/\b門診\b|\b急診\b/.test(t)?'OPD':'?';D.textContent='Detected: '+det;R.textContent=fmt()}
 let tm;const sch=()=>{clearTimeout(tm);tm=setTimeout(draw,250)};addEventListener('scroll',sch,{passive:true});new MutationObserver(sch).observe(document.body,{subtree:true,childList:true,characterData:true});
-const MSG=d.querySelector('#aMsg'),CAP=d.querySelector('#aCap'),IMG=d.querySelector('#aImg');const setMsg=(s,bad=false)=>{MSG.textContent=s;MSG.style.color=bad?'#b42318':'#667085'};const showCapture=dataUrl=>{if(!dataUrl)return;IMG.src=dataUrl;CAP.style.display='block';setMsg('截圖已貼上 ✓（目前僅預覽，ECG OCR 尚未自動判讀）')};
-function handlePaste(ev){const items=[...(ev.clipboardData?.items||[])];const it=items.find(x=>x.type&&x.type.startsWith('image/'));if(!it)return;const f=it.getAsFile();if(!f)return;const rd=new FileReader();rd.onload=()=>showCapture(rd.result);rd.readAsDataURL(f);ev.preventDefault()}
-d.addEventListener('paste',handlePaste);document.addEventListener('paste',handlePaste);
-d.querySelector('#aC').onclick=()=>navigator.clipboard.writeText(R.textContent);d.querySelector('#aK').onclick=()=>{S={byDate:{},mode:'AUTO'};sessionStorage.removeItem(KEY);R.textContent='';CAP.style.display='none';IMG.removeAttribute('src');setMsg('Cache cleared.');};d.querySelector('#aX').onclick=()=>d.remove();d.querySelector('#aS').onclick=()=>{setMsg('請按 Win+Shift+S 開啟 Windows 剪取工具 → 框選畫面 → 回 HIS 按 Ctrl+V。');d.tabIndex=-1;d.focus();};draw();
+const MSG=d.querySelector('#aMsg'),CAP=d.querySelector('#aCap'),IMG=d.querySelector('#aImg');const setMsg=(s,bad=false)=>{MSG.textContent=s;MSG.style.color=bad?'#b42318':'#667085'};const showCapture=dataUrl=>{if(!dataUrl)return;IMG.src=dataUrl;CAP.style.display='block';setMsg('Screen captured ✓ 目前已取得影像；ECG OCR 尚未自動判讀。')};addEventListener('message',ev=>{const x=ev.data;if(x&&x.type==='ACL_SCREEN_CAPTURE'&&typeof x.dataUrl==='string')showCapture(x.dataUrl)});
+async function directCapture(){let st=null;try{setMsg('Opening screen/window selector…');st=await navigator.mediaDevices.getDisplayMedia({video:{cursor:'always'},audio:false});const v=document.createElement('video');v.muted=true;v.srcObject=st;await v.play();await new Promise(r=>setTimeout(r,120));const c=document.createElement('canvas');c.width=v.videoWidth||1;c.height=v.videoHeight||1;c.getContext('2d').drawImage(v,0,0,c.width,c.height);showCapture(c.toDataURL('image/png'))}catch(e){setMsg(e?.name==='NotAllowedError'?'Screen capture was cancelled or blocked.':'Direct screen capture failed: '+(e?.message||e),true)}finally{if(st)st.getTracks().forEach(x=>x.stop())}}
+d.querySelector('#aC').onclick=()=>navigator.clipboard.writeText(R.textContent);d.querySelector('#aK').onclick=()=>{S={byDate:{},mode:'AUTO'};sessionStorage.removeItem(KEY);R.textContent='';CAP.style.display='none';IMG.removeAttribute('src');setMsg('Cache cleared.');};d.querySelector('#aX').onclick=()=>d.remove();d.querySelector('#aS').onclick=()=>{setMsg('請按 Win+Shift+S 使用 Windows 剪取工具；截圖後可直接到需要的位置 Ctrl+V。')};draw();
 })()
