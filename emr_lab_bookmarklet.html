@@ -1,6 +1,6 @@
 <!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Auto Clinical Lab Bookmarklet</title><style>
 :root{--green:#16866b;--green2:#eaf7f2;--ink:#243746;--muted:#718096;--line:#dce8e3}*{box-sizing:border-box}body{margin:0;font-family:Arial,"Microsoft JhengHei",sans-serif;background:#f6faf8;color:var(--ink)}.wrap{max-width:680px;margin:64px auto;padding:20px}.card{background:#fff;border:1px solid var(--line);border-radius:24px;padding:34px;box-shadow:0 12px 36px rgba(30,70,55,.08);text-align:center}.icon{font-size:42px;margin-bottom:8px}h1{font-size:30px;margin:4px 0 6px}.tag{color:var(--muted);margin:0 0 26px}.bm{display:inline-block;background:var(--green);color:#fff!important;text-decoration:none;font-weight:800;padding:14px 26px;border-radius:14px;box-shadow:0 7px 18px rgba(22,134,107,.18)}.hint{margin:16px 0 26px;color:var(--muted);font-size:14px}.steps{background:var(--green2);border-radius:16px;padding:18px 22px;text-align:left;line-height:1.9;font-size:14px}.ver{margin-top:22px;color:#9aa7a1;font-size:12px}@media(max-width:600px){.wrap{margin:24px auto}.card{padding:26px 20px}}
-</style></head><body><main class="wrap"><section class="card"><div class="icon">🩺</div><h1>Auto Clinical Lab</h1><p class="tag">Clinical data, simplified.</p><a id="bm" class="bm" href="#">⭐ Auto Clinical Lab</a><p class="hint">↑ 將上方按鈕拖曳到瀏覽器書籤列</p><div class="steps"><b>使用方式</b><br>1. 開啟院內 HIS 檢驗／檢查頁面<br>2. 點瀏覽器書籤列的「Auto Clinical Lab」<br>3. 自動整理目前資料<br>4. Copy → 貼到 EMR</div><div class="ver">Version 6.4.7 · Chrome / Edge</div></section></main><script>
+</style></head><body><main class="wrap"><section class="card"><div class="icon">🩺</div><h1>Auto Clinical Lab</h1><p class="tag">Clinical data, simplified.</p><a id="bm" class="bm" href="javascript:void(0)">⭐ Auto Clinical Lab</a><p class="hint">↑ <b>請把這個按鈕拖曳到瀏覽器書籤列</b><br><span style="font-size:12px">直接點這個按鈕只是在安裝頁，不會讀取 HIS。</span></p><button id="copyBm" type="button" style="border:1px solid var(--line);background:#fff;color:var(--green);font-weight:800;padding:10px 16px;border-radius:12px;cursor:pointer;margin-bottom:20px">複製 Bookmarklet 網址</button><div id="installMsg" style="min-height:20px;color:var(--muted);font-size:12px;margin:-10px 0 18px"></div><div class="steps"><b>使用方式</b><br>1. 先把「⭐ Auto Clinical Lab」拖到書籤列（只需一次）<br>2. 開啟院內 HIS 檢驗／檢查頁面<br>3. 點書籤列的「Auto Clinical Lab」→ 自動整理目前資料<br>4. Copy → 貼到 EMR</div><div class="ver">Version 6.4.7 · Chrome / Edge</div></section></main><script>
 const source="(()=>{
 const ID='__acl647', KEY='__acl647cache';
 if(document.getElementById(ID)){document.getElementById(ID).remove();return}
@@ -224,5 +224,17 @@ d.querySelector('#aC').onclick=()=>navigator.clipboard.writeText(R.textContent);
 })()
 ";
 const code=source.replace('__CAPTURE_HELPER__','');
-document.getElementById('bm').href='javascript:'+encodeURIComponent(code);
+const bookmarkletUrl='javascript:'+encodeURIComponent(code);
+const bm=document.getElementById('bm');
+bm.href=bookmarkletUrl;
+bm.addEventListener('click',ev=>{
+  ev.preventDefault();
+  const m=document.getElementById('installMsg');
+  m.textContent='這裡是安裝頁。請將「⭐ Auto Clinical Lab」拖曳到書籤列，再到 HIS 頁面點該書籤。';
+});
+document.getElementById('copyBm').addEventListener('click',async()=>{
+  const m=document.getElementById('installMsg');
+  try{await navigator.clipboard.writeText(bookmarkletUrl);m.textContent='Bookmarklet 網址已複製 ✓ 可建立新書籤後貼到「網址」欄。';}
+  catch(e){m.textContent='瀏覽器未允許自動複製；請直接拖曳上方按鈕到書籤列。';}
+});
 </script></body></html>
