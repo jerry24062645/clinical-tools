@@ -1,10 +1,10 @@
 (()=>{
-const ID='__acl646', KEY='__acl646cache';
+const ID='__acl647', KEY='__acl647cache';
 if(document.getElementById(ID)){document.getElementById(ID).remove();return}
 let S={byDate:{},mode:'AUTO'};try{S={...S,...JSON.parse(sessionStorage.getItem(KEY)||'{}')}}catch(e){}
 if(!S.byDate||typeof S.byDate!=='object')S.byDate={};
 const save=()=>sessionStorage.setItem(KEY,JSON.stringify(S));
-const txt=()=>document.body?.innerText||'';
+const txt=()=>{if(!document.body)return '';const c=document.body.cloneNode(true);c.querySelector('#'+ID)?.remove();return c.innerText||''};
 const clean=s=>String(s||'').replace(/\s+/g,' ').trim();
 function rows(){return [...document.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('th,td')].map(td=>clean(td.innerText))).filter(r=>r.length>=4)}
 const dateRe=/(\d{2,3}\/\d{2}\/\d{2})/;
@@ -41,12 +41,13 @@ function textValueAfter(r,ni){for(let i=ni+1;i<r.length;i++){const v=clean(r[i])
 function reportDate(kind,t){
  const rr=rows(); const re=kind==='echo'?/echo|Doppler color flow mapping|心臟血流圖/i:/身體組成分析|InBody|BCM-1/i;
  for(const r of rr){if(re.test(r.join(' '))){const d=rowDate(r);if(d)return d}}
- const m=t.match(dateRe);return m?m[1]:null;
+ return null;
 }
 function reportDateBy(re,t){
  for(const r of rows()){if(re.test(r.join(' '))){const d=rowDate(r);if(d)return d}}
- const m=t.match(dateRe);return m?m[1]:null;
+ return null;
 }
+function hasReportRow(re){return rows().some(r=>re.test(r.join(' ')))}
 const aliases={
  hba1c:/^HbA1c$/i,eag:/Estimated average glucose|^eAG$/i,
  gluAC:/^Glucose-AC$|^Glu-AC$|飯前血糖/i,gluPC:/^Glucose-PC$|^Glu-PC$|飯後血糖/i,
@@ -131,31 +132,42 @@ function parseSpecialText(){
  }
  if(changed)save();
 }
-function parseEcho(t){if(!/echo|M-MODE|DOPPLAER|DOPPLER|LVEF|diastolic function/i.test(t))return;const date=reportDate('echo',t);if(!date)return;const E=ensureDate(date).echo;let m;if(m=t.match(/LVEF\s*(?:about)?\s*(\d+(?:\.\d+)?)\s*%/i))E.lvef=m[1];if(/left ventricular hypertrophy|\bLVH\b/i.test(t))E.lvh=true;if(/preserved LV systolic|normal LV systolic function/i.test(t))E.sys='preserved LV systolic function';if(/normal diastolic function|Suggestive normal diastolic function/i.test(t))E.dia='normal LV diastolic function';for(const sev of ['trivial','mild','moderate','severe']){let re=new RegExp(sev+'\\s+([^\\n.]{0,60}(?:MR|TR|PR)[^\\n.]*)','ig');while(m=re.exec(t)){for(const v of ['MR','PR','TR'])if(new RegExp('\\b'+v+'\\b','i').test(m[1]))E[v]=sev}}if(m=t.match(/estimated PASP\s*(?:about)?\s*(\d+(?:\.\d+)?)\s*mmHg/i))E.pasp=m[1];save()}
-function parseInbody(t){if(!/身體組成分析|InBody|PBF|體脂肪率/i.test(t))return;const date=reportDate('inbody',t);if(!date)return;const I=ensureDate(date).inbody;const pats={BW:/(?:體重|BW)\s*[:：]?\s*(\d+(?:\.\d+)?)/i,BMI:/\bBMI\s*[:：]?\s*(\d+(?:\.\d+)?)/i,PBF:/(?:PBF|體脂肪率)\s*(?:\(%\))?\s*[:：]?\s*(\d+(?:\.\d+)?)/i,BFM:/(?:BFM|體脂肪量)\s*[:：]?\s*(\d+(?:\.\d+)?)/i,SMM:/(?:SMM|肌肉量)\s*[:：]?\s*(\d+(?:\.\d+)?)/i,VFA:/(?:VFA|內臟脂肪指數)\s*[:：]?\s*(\d+(?:\.\d+)?)/i};for(const[k,re]of Object.entries(pats)){const m=t.match(re);if(m)I[k]=m[1]}save()}
+function parseEcho(t){const head=/echo|Doppler color flow mapping|心臟血流圖/i;if(!hasReportRow(head))return;const date=reportDate('echo',t);if(!date)return;const E=ensureDate(date).echo;let m;if(m=t.match(/LVEF\s*(?:about)?\s*(\d+(?:\.\d+)?)\s*%/i))E.lvef=m[1];if(/left ventricular hypertrophy|\bLVH\b/i.test(t))E.lvh=true;if(/preserved LV systolic|normal LV systolic function/i.test(t))E.sys='preserved LV systolic function';if(/normal diastolic function|Suggestive normal diastolic function/i.test(t))E.dia='normal LV diastolic function';for(const sev of ['trivial','mild','moderate','severe']){let re=new RegExp(sev+'\\s+([^\\n.]{0,60}(?:MR|TR|PR)[^\\n.]*)','ig');while(m=re.exec(t)){for(const v of ['MR','PR','TR'])if(new RegExp('\\b'+v+'\\b','i').test(m[1]))E[v]=sev}}if(m=t.match(/estimated PASP\s*(?:about)?\s*(\d+(?:\.\d+)?)\s*mmHg/i))E.pasp=m[1];save()}
+function parseInbody(t){const head=/身體組成分析|InBody|BCM-1/i;if(!hasReportRow(head))return;const date=reportDate('inbody',t);if(!date)return;const I=ensureDate(date).inbody;const pats={BW:/(?:體重|BW)\s*[:：]?\s*(\d+(?:\.\d+)?)/i,BMI:/\bBMI\s*[:：]?\s*(\d+(?:\.\d+)?)/i,PBF:/(?:PBF|體脂肪率)\s*(?:\(%\))?\s*[:：]?\s*(\d+(?:\.\d+)?)/i,BFM:/(?:BFM|體脂肪量)\s*[:：]?\s*(\d+(?:\.\d+)?)/i,SMM:/(?:SMM|肌肉量)\s*[:：]?\s*(\d+(?:\.\d+)?)/i,VFA:/(?:VFA|內臟脂肪指數)\s*[:：]?\s*(\d+(?:\.\d+)?)/i};for(const[k,re]of Object.entries(pats)){const m=t.match(re);if(m)I[k]=m[1]}save()}
 function parseCXR(t){
  const head=/胸部檢查第一張|Chest\s*(?:X-?ray|radiograph)|\bCXR\b/i;
- if(!head.test(t))return;
+ // Only parse when the CURRENT HIS report row itself is a chest X-ray report.
+ // Never use cached overlay text as a trigger.
+ if(!hasReportRow(head))return;
  const date=reportDateBy(head,t);if(!date)return;
  const C=ensureDate(date).cxr;
  const lines=t.split(/\n+/).map(x=>clean(x)).filter(Boolean);
  const findings=[];
+ const meaningful=z=>{
+   if(!z||z.length<4)return false;
+   if(/^(?:[-_=#|.;,:\s]+)$/.test(z))return false;
+   if(/^(?:報告內容|診療項目|狀態|完報|檢視影像)/i.test(z))return false;
+   if(/ground-glass lesion.*might be missed|plain chest radiography/i.test(z))return false;
+   if(/Auto Clinical Lab|CXR\s*:/i.test(z))return false;
+   return /[A-Za-z\u4e00-\u9fff]{3,}/.test(z);
+ };
  for(const line of lines){
-   if(/ground-glass lesion.*might be missed|plain chest radiography/i.test(line))continue;
    if(/^(?:-|•)\s*/.test(line)){
-     const z=line.replace(/^(?:-|•)\s*/, '').trim();
-     if(z && !/^(?:報告內容|診療項目)/i.test(z))findings.push(z.replace(/\s+/g,' '));
+     const z=line.replace(/^(?:-|•)\s*/, '').trim().replace(/\s+/g,' ');
+     if(meaningful(z))findings.push(z);
    }
  }
  if(!findings.length){
-   for(const pat of [/Increased interstitial marking[^\n.]*(?:\.|$)/i,/Spondylosis[^\n.]*(?:\.|$)/i,/S\/?P feeding tube insertion\.?/i]){const m=t.match(pat);if(m)findings.push(clean(m[0]))}
+   for(const pat of [/Increased interstitial marking[^\n.]*(?:\.|$)/i,/Spondylosis[^\n.]*(?:\.|$)/i,/S\/?P feeding tube insertion\.?/i]){
+     const m=t.match(pat);if(m&&meaningful(clean(m[0])))findings.push(clean(m[0]));
+   }
  }
  if(findings.length)C.findings=[...new Set(findings)];
  save();
 }
 function parsePVR(t){
  const head=/心內動脈分段血流及壓力之測定\s*PUR|Pulse\s*volume\s*recording|四肢血流探測\s*[,，]?\s*壓力測量並記錄/i;
- if(!head.test(t))return;
+ if(!hasReportRow(head))return;
  const date=reportDateBy(head,t);if(!date)return;
  const P=ensureDate(date).pvr;
  const lines=t.split(/\n+/).map(x=>clean(x)).filter(Boolean);
@@ -200,9 +212,9 @@ function formatGroup(g){
 function dateKey(d){const p=d.split('/').map(Number);return p[0]*10000+p[1]*100+p[2]}
 function fmt(){parseAll();const dates=Object.keys(S.byDate).filter(d=>formatGroup(S.byDate[d]).length).sort((a,b)=>dateKey(b)-dateKey(a));return dates.map(d=>`${d}\n${formatGroup(S.byDate[d]).join('\n')}`).join('\n\n')}
 const d=document.createElement('div');d.id=ID;d.style='position:fixed;z-index:2147483647;right:12px;top:12px;width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;background:#fff;color:#243746;border:1px solid #ccd3db;border-radius:14px;box-shadow:0 12px 40px #0004;padding:14px;font:14px Arial,sans-serif';
-d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.4.6</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。新增 CXR、PVR/ABI，並保留 Echo、InBody、CBC differential、ABG/VBG、OneTouch trend、CRP/PCT/Lactate 等。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
+d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.4.7</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積。v6.4.7 修正檢查報告自我讀取：CXR/Echo/PVR/InBody 只在目前對應報告頁解析，不再把結果面板或分隔線當成 CXR。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
 const R=d.querySelector('#aR'),D=d.querySelector('#aD');function draw(){const t=txt();const det=/\b住院\b/.test(t)?'IPD':/\b門診\b|\b急診\b/.test(t)?'OPD':'?';D.textContent='Detected: '+det;R.textContent=fmt()}
-let tm;const sch=()=>{clearTimeout(tm);tm=setTimeout(draw,250)};addEventListener('scroll',sch,{passive:true});new MutationObserver(sch).observe(document.body,{subtree:true,childList:true,characterData:true});
+let tm;const sch=()=>{clearTimeout(tm);tm=setTimeout(draw,250)};addEventListener('scroll',sch,{passive:true});new MutationObserver(ms=>{if(ms.some(m=>{const e=m.target.nodeType===1?m.target:m.target.parentElement;return !(e&&e.closest&&e.closest('#'+ID))}))sch()}).observe(document.body,{subtree:true,childList:true,characterData:true});
 const MSG=d.querySelector('#aMsg'),CAP=d.querySelector('#aCap'),IMG=d.querySelector('#aImg');const setMsg=(s,bad=false)=>{MSG.textContent=s;MSG.style.color=bad?'#b42318':'#667085'};const showCapture=dataUrl=>{if(!dataUrl)return;IMG.src=dataUrl;CAP.style.display='block';setMsg('Screen captured ✓ 目前已取得影像；ECG OCR 尚未自動判讀。')};addEventListener('message',ev=>{const x=ev.data;if(x&&x.type==='ACL_SCREEN_CAPTURE'&&typeof x.dataUrl==='string')showCapture(x.dataUrl)});
 function imageFromClipboard(ev){const items=ev.clipboardData?.items||[];for(const it of items){if(it.type&&it.type.startsWith('image/')){const f=it.getAsFile();if(!f)continue;const rd=new FileReader();rd.onload=()=>showCapture(rd.result);rd.readAsDataURL(f);ev.preventDefault();return true}}return false}document.addEventListener('paste',ev=>{if(imageFromClipboard(ev))setMsg('Windows 剪取畫面已貼上 ✓')});function openSnippingTool(){setMsg('Windows 剪取工具已啟動。完成框選後回到此頁按 Ctrl+V，即可貼上截圖。');try{location.href='ms-screenclip:'}catch(e){setMsg('請按 Win + Shift + S 開啟 Windows 剪取工具；完成後回到此頁按 Ctrl+V。')}}
 d.querySelector('#aC').onclick=()=>navigator.clipboard.writeText(R.textContent);d.querySelector('#aK').onclick=()=>{S={byDate:{},mode:'AUTO'};sessionStorage.removeItem(KEY);R.textContent='';CAP.style.display='none';IMG.removeAttribute('src');setMsg('Cache cleared.');};d.querySelector('#aX').onclick=()=>d.remove();d.querySelector('#aS').onclick=()=>openSnippingTool();draw();
