@@ -270,6 +270,11 @@ function getLabs(text) {
             /Glu[-\s]?PC\s*[:=：]?\s*([\d.]+)/i
         ]),
 
+        gluPC2h: getValue(text, [
+            /(?:口服)?75\s*(?:公克|g).*?(?:兩小時|二小時|2\s*(?:h|hr|hour)).*?GLUCOSE\s*[:=：]?\s*([\d.]+)/i,
+            /Glu[-\s]?PC\s*2h\s*[:=：]?\s*([\d.]+)/i
+        ]),
+
 
         // ------------------------------
         // Lipid
@@ -390,6 +395,23 @@ function getLabs(text) {
 
         t3: getValue(text, [
             /\bT3\s*[:=：]?\s*([\d.]+)/i
+        ]),
+
+
+        // ------------------------------
+        // Primary aldosteronism screening
+        // ------------------------------
+
+        pac: getValue(text, [
+            /(?:PAC|Aldosterone|醛固酮)\s*[:=：]?\s*([\d.]+)/i
+        ]),
+
+        pra: getValue(text, [
+            /(?:PRA|Plasma\s+Renin\s+Activity|Renin\s+Activity|腎素活性)\s*[:=：]?\s*([\d.]+)/i
+        ]),
+
+        arr: getValue(text, [
+            /(?:ARR|Aldosterone.*Renin.*Ratio|醛固酮.*腎素.*比)\s*[:=：]?\s*([\d.]+)/i
         ]),
 
 
@@ -731,6 +753,11 @@ function formatEndocrine() {
             `Glu-AC ${lab.gluAC} mg/dL`
         );
     }
+    if (lab.gluPC2h) {
+        line1.push(
+            `Glu-PC 2h ${lab.gluPC2h} mg/dL`
+        );
+    }
     else if (lab.gluPC) {
         line1.push(
             `Glu-PC ${lab.gluPC} mg/dL`
@@ -854,6 +881,29 @@ function formatEndocrine() {
 
 
     // ==========================================
+    // Primary aldosteronism screening
+    // ==========================================
+
+    let pa = [];
+
+    if (lab.pac) {
+        const pacFlag = Number(lab.pac) > 15 ? "H" : "";
+        pa.push(`PAC ${pacFlag}${lab.pac} ng/dL`);
+    }
+
+    if (lab.pra) {
+        pa.push(`PRA ${lab.pra} ng/mL/hr`);
+    }
+
+    if (lab.arr) {
+        const arrFlag = Number(lab.arr) > 20 ? "H" : "";
+        pa.push(`ARR ${arrFlag}${lab.arr} ng/dL/(ng/mL/hr)`);
+    }
+
+    addLine(lines, pa);
+
+
+    // ==========================================
     // Line 5
     // CBC / FIB-4
     // ==========================================
@@ -943,6 +993,12 @@ function formatLabs() {
     if (lab.gluAC) {
         dm.push(
             `Glu-AC ${lab.gluAC} mg/dL`
+        );
+    }
+
+    if (lab.gluPC2h) {
+        dm.push(
+            `Glu-PC 2h ${lab.gluPC2h} mg/dL`
         );
     }
 
