@@ -1,18 +1,18 @@
-# Auto Clinical Lab v6.4
+# Auto Clinical Lab v6.4.4
 
-GitHub 上傳包。
+GitHub 直接覆蓋版。
 
-- `emr_lab_bookmarklet.html`: bookmarklet 安裝頁
-- `bookmarklet_source.js`: 可維護原始碼
+## 這版修正
+- 不同「完報日」依日期累積，不互相覆蓋；最新日期在最上方。
+- 同一天同一檢驗去重；OneTouch 血糖保留同日不同時間的 trend。
+- 擴充 CBC differential、ABG/VBG、Blood ketone、CRP/PCT/Lactate/D-dimer、Na/K/Cl/Ca/P/Mg、bilirubin/albumin、amylase/lipase、stool、Urine TP、TFT、lipid。
+- 保留 Urine Routine、UACR mg/g、Echo、InBody、H/L 空格、Clear cache、Capture screen。
 
-## v6.4
-- row-local lab parsing，避免把診療代碼當檢驗值
-- Clear cache 清空所有累積資料
-- H/L 與數值間保留空格
-- UACR 以 mg/g 顯示
-- Echo 捲動累積並輸出精簡摘要
-- InBody: BW / BMI / PBF / BFM / SMM / VFA
-- AUTO OPD/IPD detection
-- Capture screen 支援另一視窗/第二螢幕
+## 上傳 GitHub
+將 ZIP 解壓縮後，把以下同名檔案直接覆蓋原本 GitHub 檔案即可：
+- `emr_lab_bookmarklet.html`
+- `bookmarklet_source.js`
+- `screen_capture.html`
+- `README.md`
 
-ECG image OCR 尚未內建；Capture screen 僅擷取影像。
+> 臨床使用前仍請與原始報告核對數值、單位與日期。
