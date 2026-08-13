@@ -4,7 +4,7 @@ if(document.getElementById(ID)){document.getElementById(ID).remove();return}
 let S={byDate:{},mode:'AUTO'};try{S={...S,...JSON.parse(sessionStorage.getItem(KEY)||'{}')}}catch(e){}
 if(!S.byDate||typeof S.byDate!=='object')S.byDate={};
 const save=()=>sessionStorage.setItem(KEY,JSON.stringify(S));
-const txt=()=>document.body?.innerText||'';
+const txt=()=>{try{const b=document.body?.cloneNode(true);if(!b)return'';b.querySelector('#'+ID)?.remove();return b.innerText||''}catch(e){return document.body?.innerText||''}};
 const clean=s=>String(s||'').replace(/\s+/g,' ').trim();
 function rows(){return [...document.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('th,td')].map(td=>clean(td.innerText))).filter(r=>r.length>=4)}
 const dateRe=/(\d{2,3}\/\d{2}\/\d{2})/;
@@ -13,9 +13,9 @@ function rowDate(r){for(const c of r){const m=c.match(dateRe);if(m)return m[1]}r
 function rowTime(r){for(const c of r){const m=c.match(timeRe);if(m)return m[0]}return ''}
 function ensureDate(date){
   if(!date)return null;
-  if(!S.byDate[date])S.byDate[date]={labs:{},urine:{},bloodGas:{},cbcDiff:{},series:{poc:[]},stool:{},special:{},echo:{},inbody:{},vascular:{}};
+  if(!S.byDate[date])S.byDate[date]={labs:{},urine:{},bloodGas:{},cbcDiff:{},series:{poc:[]},stool:{},special:{},echo:{},inbody:{},vascular:{},cxr:{},ecg:{}};
   const g=S.byDate[date];
-  g.labs||={};g.urine||={};g.bloodGas||={};g.cbcDiff||={};g.series||={poc:[]};g.series.poc||=[];g.stool||={};g.special||={};g.echo||={};g.inbody||={};g.vascular||={};
+  g.labs||={};g.urine||={};g.bloodGas||={};g.cbcDiff||={};g.series||={poc:[]};g.series.poc||=[];g.stool||={};g.special||={};g.echo||={};g.inbody||={};g.vascular||={};g.cxr||={};g.ecg||={};
   return g;
 }
 function parseRef(after){
@@ -159,10 +159,54 @@ function parseVascular(t){
  if(!V.normalR&&!V.normalL&&!V.abnormalR&&!V.abnormalL&&nums.length){V.values=[...new Set(nums)].slice(0,4)}
  save();
 }
-function parseAll(){parseLabs();parseCBCDiff();parseUrine();parseBloodGas();parseSpecialText();parseEcho(txt());parseInbody(txt());parseVascular(txt())}
+
+function reportDateBy(re){for(const r of rows()){if(re.test(r.join(' '))){const d=rowDate(r);if(d)return d}}return null}
+function parseCXR(t){
+ const itemRe=/胸部檢查第一張|胸部X光|Chest\s*(?:X[- ]?ray|radiograph)|\bCXR\b/i;
+ const date=reportDateBy(itemRe);if(!date)return;
+ const joinedRows=rows().map(r=>r.join(' ')).join('\n');if(!itemRe.test(joinedRows))return;
+ const lines=t.split(/\r?\n/).map(x=>clean(x)).filter(Boolean);const keep=[];
+ for(let line of lines){
+   if(/^[-•]\s*/.test(line))line=line.replace(/^[-•]\s*/, ''); else continue;
+   if(/ground-glass lesion.*might be missed|plain chest radiography/i.test(line))continue;
+   if(/^[-=#|]+$/.test(line))continue;
+   if(line.length<6)continue;
+   keep.push(line.replace(/\s+/g,' ').trim());
+ }
+ if(keep.length){const C=ensureDate(date).cxr;C.findings=[...new Set([...(C.findings||[]),...keep])];save()}
+}
+function rocDateFromOCR(t){let m=t.match(/\b(20\d{2})[\/.-](\d{1,2})[\/.-](\d{1,2})\b/);if(!m)return null;const y=+m[1]-1911;if(y<=0)return null;return `${y}/${String(+m[2]).padStart(2,'0')}/${String(+m[3]).padStart(2,'0')}`}
+function ecgParseText(t){
+ const z=String(t||'').replace(/\r/g,'\n');const E={};let m;
+ if(m=z.match(/(?:^|\n|\s)Rate\s*[:=]?\s*(\d{2,3})\b/i))E.hr=m[1];
+ if(m=z.match(/(?:^|\n|\s)PR\s*[:=]?\s*(\d{2,3})\b/i))E.pr=m[1];
+ if(m=z.match(/QRSd?\s*[:=]?\s*(\d{2,3})\b/i))E.qrs=m[1];
+ if(m=z.match(/(?:^|\n|\s)QT\s*[:=]?\s*(\d{2,3})\b/i))E.qt=m[1];
+ if(m=z.match(/QTc\s*[:=]?\s*(\d{2,3})\b/i))E.qtc=m[1];
+ if(m=z.match(/(?:^|\n)\s*P\s+(\-?\d{1,3})\b/im))E.paxis=m[1];
+ if(m=z.match(/(?:^|\n)\s*QRS\s+(\-?\d{1,3})\b/im))E.qrsaxis=m[1];
+ if(m=z.match(/(?:^|\n)\s*T\s+(\-?\d{1,3})\b/im))E.taxis=m[1];
+ if(/Sinus\s+rhythm/i.test(z))E.rhythm='Sinus rhythm';
+ if(/borderline\s+right\s+axis\s+deviation/i.test(z))E.rad='borderline right axis deviation';
+ else if(/right\s+axis\s+deviation/i.test(z))E.rad='right axis deviation';
+ if(/consider\s+left\s+ventricular\s+hypertrophy/i.test(z))E.lvh='consider LVH';
+ else if(/left\s+ventricular\s+hypertrophy/i.test(z))E.lvh='LVH';
+ if(/ST\s*elev[^\n]{0,80}(?:early\s+repol|early\s+repolarization)/i.test(z))E.st='ST elevation, probable normal early repolarization pattern';
+ else if(/ST\s+elevation/i.test(z))E.st='ST elevation';
+ const date=rocDateFromOCR(z);
+ return {date,E};
+}
+function storeECGText(t){const {date,E}=ecgParseText(t);const dte=date||reportDateBy(/EKG|ECG|心電圖/i)||Object.keys(S.byDate).sort((a,b)=>dateKey(b)-dateKey(a))[0];if(!dte||!Object.keys(E).length)return false;Object.assign(ensureDate(dte).ecg,E);save();return true}
+async function loadTesseract(){
+ if(window.Tesseract?.recognize)return window.Tesseract;
+ return await new Promise((resolve,reject)=>{const old=document.getElementById('__aclTesseract');if(old){let n=0;const tm=setInterval(()=>{if(window.Tesseract?.recognize){clearInterval(tm);resolve(window.Tesseract)}else if(++n>40){clearInterval(tm);reject(new Error('OCR engine did not load'))}},250);return}const s=document.createElement('script');s.id='__aclTesseract';s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=()=>window.Tesseract?.recognize?resolve(window.Tesseract):reject(new Error('OCR engine unavailable'));s.onerror=()=>reject(new Error('HIS blocked the OCR engine'));document.head.appendChild(s)})
+}
+async function preprocessECG(dataUrl){return await new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>{try{const cropH=Math.max(220,Math.floor(im.height*0.34));const scale=2,c=document.createElement('canvas');c.width=im.width*scale;c.height=cropH*scale;const x=c.getContext('2d');x.drawImage(im,0,0,im.width,cropH,0,0,c.width,c.height);const id=x.getImageData(0,0,c.width,c.height),p=id.data;for(let i=0;i<p.length;i+=4){let y=0.299*p[i]+0.587*p[i+1]+0.114*p[i+2];y=y<180?0:255;p[i]=p[i+1]=p[i+2]=y}x.putImageData(id,0,0);resolve(c)}catch(e){reject(e)}};im.onerror=reject;im.src=dataUrl})}
+
+function parseAll(){const t=txt();parseLabs();parseCBCDiff();parseUrine();parseBloodGas();parseSpecialText();parseEcho(t);parseInbody(t);parseVascular(t);parseCXR(t)}
 function v(L,k){return L[k]?.v}
 function formatGroup(g){
- const L=g.labs||{},U=g.urine||{},E=g.echo||{},I=g.inbody||{},V=g.vascular||{},D=g.cbcDiff||{},BG=g.bloodGas||{},SP=g.special||{},ST=g.stool||{},lines=[];let a=[];
+ const L=g.labs||{},U=g.urine||{},E=g.echo||{},I=g.inbody||{},V=g.vascular||{},CXR=g.cxr||{},ECG=g.ecg||{},D=g.cbcDiff||{},BG=g.bloodGas||{},SP=g.special||{},ST=g.stool||{},lines=[];let a=[];
  if(v(L,'hba1c')){let x=`HbA1c ${v(L,'hba1c')}%`;if(v(L,'eag'))x+=` (eAG ${v(L,'eag')} mg/dL)`;a.push(x)}if(v(L,'gluAC'))a.push(`Glu-AC ${v(L,'gluAC')} mg/dL`);else if(v(L,'gluPC'))a.push(`Glu-PC ${v(L,'gluPC')} mg/dL`);if(v(L,'uacr'))a.push(`UACR ${v(L,'uacr')} mg/g`);if(v(L,'upcr'))a.push(`UPCR ${v(L,'upcr')} mg/g`);if(a.length)lines.push('• '+a.join('; '));
  if(v(L,'wbc')||v(L,'hb')||v(L,'plt')||Object.keys(D).length){a=[];if(v(L,'wbc'))a.push(`WBC ${v(L,'wbc')}`);if(v(L,'hb'))a.push(`Hb ${v(L,'hb')}`);if(v(L,'plt'))a.push(`Plt ${v(L,'plt')}`);if(['neut','lymp','mono','eosi','baso'].every(k=>D[k]))a.push(`N/L/M/E/B ${D.neut}/${D.lymp}/${D.mono}/${D.eosi}/${D.baso}%`);lines.push('• CBC: '+a.join('; '))}
  a=[];let lip=['tc','tg','hdl','ldl'].filter(k=>v(L,k));if(lip.length)a.push(`${lip.map(k=>({tc:'TC',tg:'TG',hdl:'HDL',ldl:'LDL'}[k])).join('/')} ${lip.map(k=>v(L,k)).join('/')} mg/dL`);if(v(L,'ua'))a.push(`UA ${v(L,'ua')} mg/dL`);if(a.length)lines.push('• '+a.join('; '));
@@ -180,16 +224,24 @@ function formatGroup(g){
  if(ST.ob||ST.transferrin){a=[];if(ST.ob)a.push(`Stool OB ${ST.ob}`);if(ST.transferrin)a.push(`Stool transferrin ${ST.transferrin}`);lines.push('• '+a.join('; '))}
  if(Object.keys(E).length){a=[];if(E.lvh)a.push('LVH');if(E.lvef)a.push(`LVEF ${E.lvef}%`);if(E.sys)a.push(E.sys);if(E.dia)a.push(E.dia);for(const sev of ['trivial','mild','moderate','severe']){const vs=['MR','PR','TR'].filter(x=>E[x]===sev);if(vs.length)a.push(`${sev} ${vs.join('/')}`)}if(E.pasp)a.push(`PASP ${E.pasp} mmHg`);if(a.length)lines.push('• Echo: '+a.join('; '))}
  if(Object.keys(I).length){const p=[];for(const k of ['BW','BMI','PBF','BFM','SMM','VFA'])if(I[k])p.push(`${k} ${I[k]}${k==='PBF'?'%':''}`);if(p.length)lines.push('• InBody: '+p.join('; '))}
- if(Object.keys(V).length){const p=[];if(V.interpR||V.interpL)p.push(`Interpretation R/L ${V.interpR||'-'}/${V.interpL||'-'}`);if(V.ncR||V.ncL)p.push(`N/C arteries R/L ${V.ncR||'-'}/${V.ncL||'-'}`);if(V.normalR||V.normalL)p.push(`ABI normal R/L ${V.normalR||'-'}/${V.normalL||'-'}`);if(V.abnormalR||V.abnormalL)p.push(`ABI abnormal R/L ${V.abnormalR||'-'}/${V.abnormalL||'-'}`);if(V.values?.length)p.push(`ABI ${V.values.join('/')}`);if(p.length)lines.push('• PVR/ABI: '+p.join('; '))}
+ if(Object.keys(V).length){const p=[];const rv=V.abnormalR||V.normalR||V.ncR||'',lv=V.abnormalL||V.normalL||V.ncL||'';if(rv||lv){if(rv)p.push(`R ${rv}${V.abnormalR?' (abnormal)':V.ncR?' (N/C)':''}`);if(lv)p.push(`L ${lv}${V.abnormalL?' (abnormal)':V.ncL?' (N/C)':''}`)}else if(V.values?.length)p.push(V.values.join('/'));if(p.length)lines.push('• PVR/ABI: '+p.join('; '))}
+ if(CXR.findings?.length)lines.push('• CXR: '+CXR.findings.join('; '));
+ if(Object.keys(ECG).length){const p=[];if(ECG.rhythm)p.push(ECG.rhythm);if(ECG.hr)p.push(`HR ${ECG.hr} bpm`);if(ECG.pr)p.push(`PR ${ECG.pr} ms`);if(ECG.qrs)p.push(`QRS ${ECG.qrs} ms`);if(ECG.qt&&ECG.qtc)p.push(`QT/QTc ${ECG.qt}/${ECG.qtc} ms`);else{if(ECG.qt)p.push(`QT ${ECG.qt} ms`);if(ECG.qtc)p.push(`QTc ${ECG.qtc} ms`)}if(ECG.rad)p.push(ECG.rad);if(ECG.lvh)p.push(ECG.lvh);if(ECG.st)p.push(ECG.st);if(p.length)lines.push('• ECG: '+p.join('; '))}
  return lines;
 }
 function dateKey(d){const p=d.split('/').map(Number);return p[0]*10000+p[1]*100+p[2]}
 function fmt(){parseAll();const dates=Object.keys(S.byDate).filter(d=>formatGroup(S.byDate[d]).length).sort((a,b)=>dateKey(b)-dateKey(a));return dates.map(d=>`${d}\n${formatGroup(S.byDate[d]).join('\n')}`).join('\n\n')}
 const d=document.createElement('div');d.id=ID;d.style='position:fixed;z-index:2147483647;right:12px;top:12px;width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;background:#fff;color:#243746;border:1px solid #ccd3db;border-radius:14px;box-shadow:0 12px 40px #0004;padding:14px;font:14px Arial,sans-serif';
-d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.4.5</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。新增 CBC differential、ABG/VBG、OneTouch trend、CRP/PCT/Lactate、electrolytes、bilirubin/albumin、stool、blood ketone、amylase/lipase、Urine TP。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
+d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.4.6</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。新增 CBC differential、ABG/VBG、OneTouch trend、CRP/PCT/Lactate、electrolytes、bilirubin/albumin、stool、blood ketone、amylase/lipase、Urine TP。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
 const R=d.querySelector('#aR'),D=d.querySelector('#aD');function draw(){const t=txt();const det=/\b住院\b/.test(t)?'IPD':/\b門診\b|\b急診\b/.test(t)?'OPD':'?';D.textContent='Detected: '+det;R.textContent=fmt()}
 let tm;const sch=()=>{clearTimeout(tm);tm=setTimeout(draw,250)};addEventListener('scroll',sch,{passive:true});new MutationObserver(sch).observe(document.body,{subtree:true,childList:true,characterData:true});
-const MSG=d.querySelector('#aMsg'),CAP=d.querySelector('#aCap'),IMG=d.querySelector('#aImg');const setMsg=(s,bad=false)=>{MSG.textContent=s;MSG.style.color=bad?'#b42318':'#667085'};const showCapture=dataUrl=>{if(!dataUrl)return;IMG.src=dataUrl;CAP.style.display='block';setMsg('Screen captured ✓ 目前已取得影像；ECG OCR 尚未自動判讀。')};addEventListener('message',ev=>{const x=ev.data;if(x&&x.type==='ACL_SCREEN_CAPTURE'&&typeof x.dataUrl==='string')showCapture(x.dataUrl)});
-async function directCapture(){let st=null;try{setMsg('Opening screen/window selector…');st=await navigator.mediaDevices.getDisplayMedia({video:{cursor:'always'},audio:false});const v=document.createElement('video');v.muted=true;v.srcObject=st;await v.play();await new Promise(r=>setTimeout(r,120));const c=document.createElement('canvas');c.width=v.videoWidth||1;c.height=v.videoHeight||1;c.getContext('2d').drawImage(v,0,0,c.width,c.height);showCapture(c.toDataURL('image/png'))}catch(e){setMsg(e?.name==='NotAllowedError'?'Screen capture was cancelled or blocked.':'Direct screen capture failed: '+(e?.message||e),true)}finally{if(st)st.getTracks().forEach(x=>x.stop())}}
-d.querySelector('#aC').onclick=()=>navigator.clipboard.writeText(R.textContent);d.querySelector('#aK').onclick=()=>{S={byDate:{},mode:'AUTO'};sessionStorage.removeItem(KEY);R.textContent='';CAP.style.display='none';IMG.removeAttribute('src');setMsg('Cache cleared.');};d.querySelector('#aX').onclick=()=>d.remove();d.querySelector('#aS').onclick=()=>{setMsg('請按 Win+Shift+S 使用 Windows 剪取工具；截圖後可直接到需要的位置 Ctrl+V。')};draw();
+const MSG=d.querySelector('#aMsg'),CAP=d.querySelector('#aCap'),IMG=d.querySelector('#aImg');const setMsg=(s,bad=false)=>{MSG.textContent=s;MSG.style.color=bad?'#b42318':'#667085'};const showCapture=dataUrl=>{if(!dataUrl)return;IMG.src=dataUrl;CAP.style.display='block';setMsg('截圖已貼上 ✓，準備 ECG OCR…')};addEventListener('message',ev=>{const x=ev.data;if(x&&x.type==='ACL_SCREEN_CAPTURE'&&typeof x.dataUrl==='string')showCapture(x.dataUrl)});
+async function ocrECG(dataUrl){
+ try{showCapture(dataUrl);setMsg('ECG OCR 讀取中…（影像只在瀏覽器本機處理）');const T=await loadTesseract();const c=await preprocessECG(dataUrl);const out=await T.recognize(c,'eng',{logger:m=>{if(m?.status==='recognizing text'&&Number.isFinite(m.progress))setMsg(`ECG OCR ${Math.round(m.progress*100)}%…`)}});const text=out?.data?.text||'';if(!storeECGText(text)){setMsg('ECG OCR 完成，但未辨識到足夠的 ECG 欄位；請確認截圖包含上方機器判讀文字。',true);return}draw();setMsg('ECG OCR 完成 ✓ 已加入 ECG summary。')}
+ catch(e){setMsg('ECG OCR 無法啟動：'+(e?.message||e)+'。可點 Windows 剪取工具開啟安全 OCR helper。',true)}
+}
+async function handlePaste(ev){const items=[...(ev.clipboardData?.items||[])];const it=items.find(x=>x.type?.startsWith('image/'));if(!it)return;ev.preventDefault();const f=it.getAsFile();if(!f)return;const rd=new FileReader();rd.onload=()=>ocrECG(rd.result);rd.readAsDataURL(f)}
+document.addEventListener('paste',handlePaste,true);
+addEventListener('message',ev=>{const x=ev.data;if(x&&x.type==='ACL_ECG_OCR_TEXT'&&typeof x.text==='string'){if(storeECGText(x.text)){draw();setMsg('ECG OCR 完成 ✓ 已加入 ECG summary。')}else setMsg('OCR helper 未辨識到足夠 ECG 欄位。',true)}else if(x&&x.type==='ACL_SCREEN_CAPTURE'&&typeof x.dataUrl==='string')ocrECG(x.dataUrl)});
+d.querySelector('#aC').onclick=()=>navigator.clipboard.writeText(R.textContent);d.querySelector('#aK').onclick=()=>{S={byDate:{},mode:'AUTO'};sessionStorage.removeItem(KEY);R.textContent='';CAP.style.display='none';IMG.removeAttribute('src');setMsg('Cache cleared.');};d.querySelector('#aX').onclick=()=>{document.removeEventListener('paste',handlePaste,true);d.remove()};d.querySelector('#aS').onclick=()=>{setMsg('請按 Win+Shift+S 截取 ECG，回到此 HIS 頁面按 Ctrl+V；會自動 OCR。若 HIS 阻擋 OCR，將開啟安全 helper。');const helper='https://jerry24062645.github.io/clinical-tools/screen_capture.html';try{const w=open(helper,'aclScreenCapture','width=940,height=760,resizable=yes,scrollbars=yes');if(w)w.focus()}catch(e){}};draw();
 })()

@@ -1,1 +1,33 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Auto Clinical Lab — Screen Capture</title><style>body{font-family:Arial,"Microsoft JhengHei",sans-serif;background:#f5f7fa;color:#243746;margin:0;padding:28px}.card{max-width:900px;margin:auto;background:#fff;border:1px solid #d8dee6;border-radius:16px;padding:22px;box-shadow:0 8px 28px #0001}button{padding:11px 18px;border:0;border-radius:9px;background:#078f87;color:white;font-weight:700;cursor:pointer}.muted{color:#667085;font-size:14px}#msg{margin:12px 0}img{max-width:100%;max-height:480px;border:1px solid #d8dee6;border-radius:10px;display:none}</style></head><body><div class="card"><h2>Capture ECG / another screen</h2><p class="muted">按下方按鈕後，Chrome 會讓你選擇「分頁 / 視窗 / 整個螢幕」。雙螢幕時可直接選 ECG 所在的螢幕。</p><button id="go">Choose screen / window</button><div id="msg"></div><img id="preview"></div><script>const msg=document.getElementById('msg'),img=document.getElementById('preview');document.getElementById('go').onclick=async()=>{let st=null;try{if(!window.isSecureContext||!navigator.mediaDevices?.getDisplayMedia)throw new Error('Screen Capture API is unavailable in this browser/context.');msg.textContent='Opening selector…';st=await navigator.mediaDevices.getDisplayMedia({video:{cursor:'always'},audio:false});const v=document.createElement('video');v.muted=true;v.srcObject=st;await v.play();await new Promise(r=>setTimeout(r,120));const c=document.createElement('canvas');c.width=v.videoWidth||1;c.height=v.videoHeight||1;c.getContext('2d').drawImage(v,0,0,c.width,c.height);const dataUrl=c.toDataURL('image/png');img.src=dataUrl;img.style.display='block';msg.textContent='Captured ✓ Returning image to Auto Clinical Lab…';if(window.opener&&!window.opener.closed){window.opener.postMessage({type:'ACL_SCREEN_CAPTURE',dataUrl},'*');setTimeout(()=>window.close(),500)}else{msg.textContent='Captured ✓ The original HIS window is no longer available; keep this preview open.'}}catch(e){msg.textContent=(e&&e.name==='NotAllowedError')?'Capture cancelled or blocked.':('Capture failed: '+(e?.message||e));}finally{if(st)st.getTracks().forEach(t=>t.stop())}};</script></body></html>
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Auto Clinical Lab — ECG OCR Helper</title>
+<style>
+body{font-family:Arial,"Microsoft JhengHei",sans-serif;margin:24px;color:#243746;background:#f5f7fa}
+main{max-width:920px;margin:auto;background:#fff;border:1px solid #ccd3db;padding:18px}
+#drop{border:2px dashed #9aa7b5;padding:24px;text-align:center;margin:14px 0;background:#fafcff}
+#preview{max-width:100%;max-height:420px;display:none;border:1px solid #ccd3db}
+#raw{white-space:pre-wrap;font-family:Consolas,monospace;font-size:12px;background:#f7f9fb;padding:10px;display:none}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body>
+<main>
+<h3>ECG OCR Helper</h3>
+<p>1. 按 <b>Win + Shift + S</b> 擷取 ECG。 2. 回到此頁按 <b>Ctrl + V</b>。 3. 完成後會自動回傳 Auto Clinical Lab。</p>
+<div id="drop">請在這裡 Ctrl + V 貼上 ECG 截圖</div>
+<div id="msg">等待截圖…</div>
+<img id="preview" alt="ECG preview">
+<pre id="raw"></pre>
+</main>
+<script>
+const msg=document.getElementById('msg'),preview=document.getElementById('preview'),raw=document.getElementById('raw');
+function setMsg(x,bad=false){msg.textContent=x;msg.style.color=bad?'#b42318':'#243746'}
+async function preprocess(dataUrl){return await new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>{try{const cropH=Math.max(220,Math.floor(im.height*0.34)),scale=2,c=document.createElement('canvas');c.width=im.width*scale;c.height=cropH*scale;const x=c.getContext('2d');x.drawImage(im,0,0,im.width,cropH,0,0,c.width,c.height);const id=x.getImageData(0,0,c.width,c.height),p=id.data;for(let i=0;i<p.length;i+=4){let y=.299*p[i]+.587*p[i+1]+.114*p[i+2];y=y<180?0:255;p[i]=p[i+1]=p[i+2]=y}x.putImageData(id,0,0);resolve(c)}catch(e){reject(e)}};im.onerror=reject;im.src=dataUrl})}
+async function run(dataUrl){preview.src=dataUrl;preview.style.display='block';try{if(!window.Tesseract?.recognize)throw new Error('OCR engine 無法載入');setMsg('ECG OCR 讀取中…');const c=await preprocess(dataUrl);const out=await Tesseract.recognize(c,'eng',{logger:m=>{if(m?.status==='recognizing text')setMsg(`ECG OCR ${Math.round((m.progress||0)*100)}%…`)}});const text=out?.data?.text||'';raw.textContent=text;raw.style.display='block';if(!text.trim())throw new Error('未辨識到文字');if(window.opener&&!window.opener.closed){window.opener.postMessage({type:'ACL_ECG_OCR_TEXT',text},'*');setMsg('ECG OCR 完成 ✓ 已回傳 Auto Clinical Lab。');}else setMsg('ECG OCR 完成，但原 HIS 視窗已關閉。',true)}catch(e){setMsg('ECG OCR 失敗：'+(e?.message||e),true)}}
+addEventListener('paste',ev=>{const it=[...(ev.clipboardData?.items||[])].find(x=>x.type?.startsWith('image/'));if(!it)return;ev.preventDefault();const f=it.getAsFile();const r=new FileReader();r.onload=()=>run(r.result);r.readAsDataURL(f)},true);
+</script>
+</body>
+</html>
