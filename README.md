@@ -1,12 +1,14 @@
-# clinical-tools v6
+# clinical-tools v6.1
 
 - `index.html`: Clinical Tools landing page.
 - `emr_lab_bookmarklet.html`: primary Auto Clinical Lab bookmarklet installer.
 - `bookmarklet_source.js`: readable source used to generate the bookmarklet URL.
 - `emr_lab_formatter.html`: manual / backup formatter.
 
-## v6 changes
+## v6.1 changes
 
+- Fixes blank-result false reads by mapping each row to the visible `檢驗值` column using screen geometry; blank result cells are ignored.
+- Uses a new v6.1 session cache key so bad values cached by v6 are not carried forward.
 - Keeps v5 AUTO detection for `OPD`, `ER`, and `Inpatient`.
 - Automatically prefixes numeric results with `H` / `L` when outside the report's normal reference range.
 - Adds 75 g OGTT 2-hour glucose recognition and outputs `Glu-PC 2h`.
