@@ -1,15 +1,45 @@
 (()=>{
-const ID='__acl644', KEY='__acl644cache';
+const ID='__acl644', KEY='__acl651cache';
 if(document.getElementById(ID)){document.getElementById(ID).remove();return}
 let S={byDate:{},mode:'AUTO'};try{S={...S,...JSON.parse(sessionStorage.getItem(KEY)||'{}')}}catch(e){}
 if(!S.byDate||typeof S.byDate!=='object')S.byDate={};
 const save=()=>sessionStorage.setItem(KEY,JSON.stringify(S));
 const txt=()=>{try{const b=document.body?.cloneNode(true);if(!b)return'';b.querySelector('#'+ID)?.remove();return b.innerText||''}catch(e){return document.body?.innerText||''}};
+function clinicalView(){
+  const t=txt();
+  const isLab=/細項名稱/.test(t)&&/檢驗值/.test(t)&&/診療項目/.test(t);
+  const isReport=/申請序號/.test(t)&&/診療項目/.test(t)&&(/完報時間/.test(t)||/報告內容/.test(t)||/檢視影像/.test(t));
+  return isLab?'LAB':(isReport?'REPORT':'');
+}
 const clean=s=>String(s||'').replace(/\s+/g,' ').trim();
-function rows(){return [...document.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('th,td')].map(td=>clean(td.innerText))).filter(r=>r.length>=4)}
 const dateRe=/(\d{2,3}\/\d{2}\/\d{2})/;
 const timeRe=/\b([01]?\d|2[0-3]):[0-5]\d\b/;
-function rowDate(r){for(const c of r){const m=c.match(dateRe);if(m)return m[1]}return null}
+const completionHeaderRe=/^(?:最終)?完報(?:日(?:時)?|時間|日時)$/i;
+function rows(){
+  const out=[];
+  for(const table of document.querySelectorAll('table')){
+    let completionIdx=-1;
+    for(const tr of table.querySelectorAll('tr')){
+      const r=[...tr.querySelectorAll('th,td')].map(td=>clean(td.innerText));
+      if(r.length<4)continue;
+      const idx=r.findIndex(c=>completionHeaderRe.test(c));
+      if(idx>=0){completionIdx=idx;out.push(r);continue}
+      if(completionIdx>=0&&r[completionIdx]){
+        const m=r[completionIdx].match(dateRe);
+        if(m)Object.defineProperty(r,'_completionDate',{value:m[1],enumerable:false});
+      }
+      out.push(r);
+    }
+  }
+  return out;
+}
+function rowDate(r){
+  if(r&&r._completionDate)return r._completionDate;
+  const dates=[];
+  for(const c of r||[]){const m=c.match(dateRe);if(m)dates.push(m[1])}
+  const uniq=[...new Set(dates)];
+  return uniq.length===1?uniq[0]:null;
+}
 function rowTime(r){for(const c of r){const m=c.match(timeRe);if(m)return m[0]}return ''}
 function ensureDate(date){
   if(!date)return null;
@@ -41,7 +71,7 @@ function textValueAfter(r,ni){for(let i=ni+1;i<r.length;i++){const v=clean(r[i])
 function reportDate(kind,t){
  const rr=rows(); const re=kind==='echo'?/echo|Doppler color flow mapping|心臟血流圖/i:/身體組成分析|InBody|BCM-1/i;
  for(const r of rr){if(re.test(r.join(' '))){const d=rowDate(r);if(d)return d}}
- const m=t.match(dateRe);return m?m[1]:null;
+ return null;
 }
 const aliases={
  hba1c:/^HbA1c$/i,eag:/Estimated average glucose|^eAG$/i,
@@ -55,9 +85,10 @@ const aliases={
  tsh:/^TSH$/i,ft4:/^(?:Free T4|FT4)$/i,t3:/^T3$/i,
  wbc:/白血球計數WBC|^WBC$/i,hb:/血色素Hemoglobin|^Hemoglobin$|^HGB$|^Hb$/i,mcv:/^MCV$/i,plt:/血小板計數Platelet|^Platelet$/i,
  uacr:/Microalbumin\/Cr urine ratio|Microalbumin\/Cr|^UACR$/i,upcr:/^UPCR$/i,urineTP:/TP-spot urine/i,
- pra:/Renin activity|^PRA$/i,pac:/^Aldosterone$|^PAC$/i
+ pra:/Renin activity|^PRA$/i,pac:/^Aldosterone$|^PAC$/i,
+ aptt:/^APTT$|^aPTT$/i,pt:/^Prothrombin time$|^PT$/i,inr:/^INR$/i
 };
-const units={hba1c:'%',eag:'mg/dL',gluAC:'mg/dL',gluPC:'mg/dL',tc:'mg/dL',tg:'mg/dL',hdl:'mg/dL',ldl:'mg/dL',ua:'mg/dL',bun:'mg/dL',cr:'mg/dL',egfr:'',ast:'U/L',alt:'U/L',tbil:'mg/dL',dbil:'mg/dL',alb:'g/dL',na:'mmol/L',k:'mmol/L',cl:'mmol/L',ca:'mg/dL',mg:'mg/dL',p:'mg/dL',crp:'mg/dL',pct:'ng/mL',lactate:'mg/dL',amylase:'U/L',lipase:'U/L',ddimer:'ng/mL',tsh:'uIU/mL',ft4:'ng/dL',t3:'ng/mL',wbc:'10^3/uL',hb:'g/dL',mcv:'fL',plt:'10^3/uL',uacr:'mg/g',upcr:'mg/g',urineTP:'mg/L',pra:'ng/mL/hr',pac:'ng/dL'};
+const units={hba1c:'%',eag:'mg/dL',gluAC:'mg/dL',gluPC:'mg/dL',tc:'mg/dL',tg:'mg/dL',hdl:'mg/dL',ldl:'mg/dL',ua:'mg/dL',bun:'mg/dL',cr:'mg/dL',egfr:'',ast:'U/L',alt:'U/L',tbil:'mg/dL',dbil:'mg/dL',alb:'g/dL',na:'mmol/L',k:'mmol/L',cl:'mmol/L',ca:'mg/dL',mg:'mg/dL',p:'mg/dL',crp:'mg/dL',pct:'ng/mL',lactate:'mg/dL',amylase:'U/L',lipase:'U/L',ddimer:'ng/mL',tsh:'uIU/mL',ft4:'ng/dL',t3:'ng/mL',wbc:'10^3/uL',hb:'g/dL',mcv:'fL',plt:'10^3/uL',uacr:'mg/g',upcr:'mg/g',urineTP:'mg/L',pra:'ng/mL/hr',pac:'ng/dL',aptt:'sec',pt:'sec',inr:''};
 function parseLabs(){
  let changed=false;
  for(const r of rows()){
@@ -133,7 +164,7 @@ function parseVascular(t){
  if(!/心內動脈分段血流及壓力之測定|四肢血流探測\s*[,，]?\s*壓力測量並記錄|Pulse\s*volume\s*recording|\bABI\b/i.test(t))return;
  const rr=rows();let date=null;
  for(const r of rr){if(/心內動脈分段血流及壓力之測定|四肢血流探測\s*[,，]?\s*壓力測量並記錄|Pulse\s*volume\s*recording/i.test(r.join(' '))){date=rowDate(r);if(date)break}}
- if(!date){const m=t.match(dateRe);date=m&&m[1]}if(!date)return;
+ if(!date)return;
  const V=ensureDate(date).vascular;
  // Parse the visible report body by lines. HIS layout is: interpretation | right | left |
  const ls=t.split(/\n+/).map(clean).filter(Boolean);
@@ -218,6 +249,7 @@ function formatGroup(g){
  a=[];if(v(L,'amylase'))a.push(`Amylase ${v(L,'amylase')} U/L`);if(v(L,'lipase'))a.push(`Lipase ${v(L,'lipase')} U/L`);if(a.length)lines.push('• '+a.join('; '));
  a=[];if(v(L,'ft4'))a.push(`FT4 ${v(L,'ft4')} ng/dL`);if(v(L,'tsh'))a.push(`TSH ${v(L,'tsh')} uIU/mL`);if(v(L,'t3'))a.push(`T3 ${v(L,'t3')} ng/mL`);if(a.length)lines.push('• TFT: '+a.join('; '));
  if(v(L,'pra')||v(L,'pac')){a=[];if(v(L,'pra'))a.push(`PRA ${v(L,'pra')} ng/mL/hr`);if(v(L,'pac'))a.push(`PAC ${v(L,'pac')} ng/dL`);lines.push('• '+a.join('; '))}
+ if(v(L,'aptt')||v(L,'pt')||v(L,'inr')){a=[];if(v(L,'pt'))a.push(`PT ${v(L,'pt')} sec`);if(v(L,'inr'))a.push(`INR ${v(L,'inr')}`);if(v(L,'aptt'))a.push(`aPTT ${v(L,'aptt')} sec`);lines.push('• Coag: '+a.join('; '))}
  if(v(L,'urineTP'))lines.push(`• Urine TP ${v(L,'urineTP')} mg/L`);
  if(Object.keys(U).length){const p=[],labels={glu:'Glu',pro:'PRO',ket:'Ket',ob:'OB',nit:'Nit',le:'LE',rbc:'RBC',wbc:'WBC',bacteria:'Bacteria',sg:'Sp.gr',ph:'pH'};for(const k of ['glu','pro','ket','ob','nit','le','rbc','wbc','bacteria','sg','ph'])if(U[k]!==undefined){let z=U[k];if(['rbc','wbc'].includes(k)&&/^\d+\s*[-~]\s*\d+$/i.test(z))z=z.replace(/\s*~\s*/,'-')+'/HPF';p.push(`${labels[k]} ${z}`)}if(p.length)lines.push('• Urine: '+p.join('; '))}
  if(Object.keys(BG).length){a=[];for(const [k,label,unit] of [['ph','pH',''],['pco2','pCO2',' mmHg'],['hco3','HCO3',' mmol/L'],['be','BE',' mmol/L'],['po2','pO2',' mmHg'],['so2','sO2','%']])if(BG[k])a.push(`${label} ${BG[k]}${unit}`);if(a.length)lines.push(`• ${BG.type||'Blood gas'}: `+a.join('; '))}
@@ -234,8 +266,8 @@ function formatGroup(g){
 function dateKey(d){const p=d.split('/').map(Number);return p[0]*10000+p[1]*100+p[2]}
 function fmt(){parseAll();const dates=Object.keys(S.byDate).filter(d=>formatGroup(S.byDate[d]).length).sort((a,b)=>dateKey(b)-dateKey(a));return dates.map(d=>`${d}\n${formatGroup(S.byDate[d]).join('\n')}`).join('\n\n')}
 const d=document.createElement('div');d.id=ID;d.style='position:fixed;z-index:2147483647;right:12px;top:12px;width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;background:#fff;color:#243746;border:1px solid #ccd3db;border-radius:14px;box-shadow:0 12px 40px #0004;padding:14px;font:14px Arial,sans-serif';
-d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.4.8</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。新增 CBC differential、ABG/VBG、OneTouch trend、CRP/PCT/Lactate、electrolytes、bilirubin/albumin、stool、blood ketone、amylase/lipase、Urine TP。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
-const R=d.querySelector('#aR'),D=d.querySelector('#aD');function draw(){const t=txt();const det=/\b住院\b/.test(t)?'IPD':/\b門診\b|\b急診\b/.test(t)?'OPD':'?';D.textContent='Detected: '+det;R.textContent=fmt()}
+d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.5.1</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。以完報日為唯一日期基準（不使用看診日／診療日／開單日）；新增 aPTT / PT / INR。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
+const R=d.querySelector('#aR'),D=d.querySelector('#aD');function draw(){const t=txt();const det=/\b住院\b/.test(t)?'IPD':/\b門診\b|\b急診\b/.test(t)?'OPD':'?';D.textContent='Detected: '+det;const view=clinicalView();if(!view){R.textContent='';return}R.textContent=fmt()}
 let tm;const sch=()=>{clearTimeout(tm);tm=setTimeout(draw,250)};addEventListener('scroll',sch,{passive:true});new MutationObserver(sch).observe(document.body,{subtree:true,childList:true,characterData:true});
 const MSG=d.querySelector('#aMsg'),CAP=d.querySelector('#aCap'),IMG=d.querySelector('#aImg');const setMsg=(s,bad=false)=>{MSG.textContent=s;MSG.style.color=bad?'#b42318':'#667085'};const showCapture=dataUrl=>{if(!dataUrl)return;IMG.src=dataUrl;CAP.style.display='block';setMsg('截圖已貼上 ✓，準備 ECG OCR…')};addEventListener('message',ev=>{const x=ev.data;if(x&&x.type==='ACL_SCREEN_CAPTURE'&&typeof x.dataUrl==='string')showCapture(x.dataUrl)});
 async function ocrECG(dataUrl){
