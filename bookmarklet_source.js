@@ -1,5 +1,5 @@
 (()=>{
-const ID='__acl644', KEY='__acl651cache';
+const ID='__acl644', KEY='__acl652cache';
 if(document.getElementById(ID)){document.getElementById(ID).remove();return}
 let S={byDate:{},mode:'AUTO'};try{S={...S,...JSON.parse(sessionStorage.getItem(KEY)||'{}')}}catch(e){}
 if(!S.byDate||typeof S.byDate!=='object')S.byDate={};
@@ -151,6 +151,9 @@ function parseSpecialText(){
      if(/Ketone Body\s*\(BLOOD\)/i.test(c)){const tv=textValueAfter(r,i);if(tv){g.special.bloodKetone=tv.v;changed=true}}
      if(/Transferrin-Stool/i.test(c)){const tv=textValueAfter(r,i);if(tv){g.stool.transferrin=tv.v;changed=true}}
      if(/Stool occult blood|FOBT\/EIA/i.test(c)){const tv=textValueAfter(r,i);if(tv){g.stool.ob=tv.v;changed=true}}
+     if(/SARS[- ]?CoV[- ]?2\s*Ag\s*test|COVID[- ]?19\s*Ag|新型冠狀病毒.*抗原/i.test(c)){const tv=textValueAfter(r,i);if(tv){g.special.covidAg=tv.v;changed=true}}
+     if(/Flu\s*A\s*rapid\s*PCR|流感病毒A快速核酸檢測/i.test(c)){const tv=textValueAfter(r,i);if(tv){g.special.fluA=tv.v;changed=true}}
+     if(/Flu\s*B\s*rapid\s*PCR|流感病毒B快速核酸檢測/i.test(c)){const tv=textValueAfter(r,i);if(tv){g.special.fluB=tv.v;changed=true}}
      if(/OneTouch.*Glucose|病房專用OneTouch/i.test(c)){
        const nv=numericAfter(r,i);if(nv){const {lo,hi}=parseRef(r.slice(nv.i+1));const item={time:rowTime(r),v:flag(nv.v,lo,hi),raw:nv.v};const sig=item.time+'|'+item.raw;if(!g.series.poc.some(x=>(x.time+'|'+x.raw)===sig))g.series.poc.push(item);changed=true}
      }
@@ -254,6 +257,7 @@ function formatGroup(g){
  if(Object.keys(U).length){const p=[],labels={glu:'Glu',pro:'PRO',ket:'Ket',ob:'OB',nit:'Nit',le:'LE',rbc:'RBC',wbc:'WBC',bacteria:'Bacteria',sg:'Sp.gr',ph:'pH'};for(const k of ['glu','pro','ket','ob','nit','le','rbc','wbc','bacteria','sg','ph'])if(U[k]!==undefined){let z=U[k];if(['rbc','wbc'].includes(k)&&/^\d+\s*[-~]\s*\d+$/i.test(z))z=z.replace(/\s*~\s*/,'-')+'/HPF';p.push(`${labels[k]} ${z}`)}if(p.length)lines.push('• Urine: '+p.join('; '))}
  if(Object.keys(BG).length){a=[];for(const [k,label,unit] of [['ph','pH',''],['pco2','pCO2',' mmHg'],['hco3','HCO3',' mmol/L'],['be','BE',' mmol/L'],['po2','pO2',' mmHg'],['so2','sO2','%']])if(BG[k])a.push(`${label} ${BG[k]}${unit}`);if(a.length)lines.push(`• ${BG.type||'Blood gas'}: `+a.join('; '))}
  if(SP.bloodKetone)lines.push(`• Ketone ${SP.bloodKetone}`);
+ if(SP.covidAg||SP.fluA||SP.fluB){a=[];if(SP.covidAg)a.push(`SARS-CoV-2 Ag ${SP.covidAg}`);if(SP.fluA)a.push(`Flu A ${SP.fluA}`);if(SP.fluB)a.push(`Flu B ${SP.fluB}`);lines.push('• Viral: '+a.join('; '))}
  if(g.series?.poc?.length){const arr=[...g.series.poc].sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));lines.push('• Glucose: '+arr.map(x=>`${x.time||''} ${x.v}`.trim()).join(' → ')+' mg/dL')}
  if(ST.ob||ST.transferrin){a=[];if(ST.ob)a.push(`Stool OB ${ST.ob}`);if(ST.transferrin)a.push(`Stool transferrin ${ST.transferrin}`);lines.push('• '+a.join('; '))}
  if(Object.keys(E).length){a=[];if(E.lvh)a.push('LVH');if(E.lvef)a.push(`LVEF ${E.lvef}%`);if(E.sys)a.push(E.sys);if(E.dia)a.push(E.dia);for(const sev of ['trivial','mild','moderate','severe']){const vs=['MR','PR','TR'].filter(x=>E[x]===sev);if(vs.length)a.push(`${sev} ${vs.join('/')}`)}if(E.pasp)a.push(`PASP ${E.pasp} mmHg`);if(a.length)lines.push('• Echo: '+a.join('; '))}
@@ -266,7 +270,7 @@ function formatGroup(g){
 function dateKey(d){const p=d.split('/').map(Number);return p[0]*10000+p[1]*100+p[2]}
 function fmt(){parseAll();const dates=Object.keys(S.byDate).filter(d=>formatGroup(S.byDate[d]).length).sort((a,b)=>dateKey(b)-dateKey(a));return dates.map(d=>`${d}\n${formatGroup(S.byDate[d]).join('\n')}`).join('\n\n')}
 const d=document.createElement('div');d.id=ID;d.style='position:fixed;z-index:2147483647;right:12px;top:12px;width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;background:#fff;color:#243746;border:1px solid #ccd3db;border-radius:14px;box-shadow:0 12px 40px #0004;padding:14px;font:14px Arial,sans-serif';
-d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.5.1</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。以完報日為唯一日期基準（不使用看診日／診療日／開單日）；新增 aPTT / PT / INR。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
+d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.5.2</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。以完報日為唯一日期基準（不使用看診日／診療日／開單日）；新增 aPTT / PT / INR；SARS-CoV-2 Ag / Flu A / Flu B。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
 const R=d.querySelector('#aR'),D=d.querySelector('#aD');function draw(){const t=txt();const det=/\b住院\b/.test(t)?'IPD':/\b門診\b|\b急診\b/.test(t)?'OPD':'?';D.textContent='Detected: '+det;const view=clinicalView();if(!view){R.textContent='';return}R.textContent=fmt()}
 let tm;const sch=()=>{clearTimeout(tm);tm=setTimeout(draw,250)};addEventListener('scroll',sch,{passive:true});new MutationObserver(sch).observe(document.body,{subtree:true,childList:true,characterData:true});
 const MSG=d.querySelector('#aMsg'),CAP=d.querySelector('#aCap'),IMG=d.querySelector('#aImg');const setMsg=(s,bad=false)=>{MSG.textContent=s;MSG.style.color=bad?'#b42318':'#667085'};const showCapture=dataUrl=>{if(!dataUrl)return;IMG.src=dataUrl;CAP.style.display='block';setMsg('截圖已貼上 ✓，準備 ECG OCR…')};addEventListener('message',ev=>{const x=ev.data;if(x&&x.type==='ACL_SCREEN_CAPTURE'&&typeof x.dataUrl==='string')showCapture(x.dataUrl)});
