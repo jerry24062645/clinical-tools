@@ -1,5 +1,5 @@
 (()=>{
-const ID='__acl644', KEY='__acl679cache';
+const ID='__acl644', KEY='__acl683cache';
 if(document.getElementById(ID)){document.getElementById(ID).remove();return}
 let S={byDate:{},mode:'AUTO'};try{S={...S,...JSON.parse(sessionStorage.getItem(KEY)||'{}')}}catch(e){}
 if(!S.byDate||typeof S.byDate!=='object')S.byDate={};
@@ -174,6 +174,15 @@ function parseRPR(){
  if(changed)save();
 }
 
+
+function parseHepatitisQualRow(r, ni){
+ for(let i=ni+1;i<r.length;i++){
+   const z=clean(r[i]);
+   const m=z.match(/^(Negative|Positive|Reactive|Non[- ]?Reactive)\s*(?:\(\s*([0-9.]+)\s*\))?$/i);
+   if(m)return {value:m[2]?`${m[1]}(${m[2]})`:m[1], vi:i};
+ }
+ return null;
+}
 function parseLabs(){
  let changed=false;
  for(const r of rows()){
@@ -184,7 +193,12 @@ function parseLabs(){
      if(key){hit={key,name:c,ni:ci};break}
    }
    if(!hit)continue;
-   const date=rowDate(r);if(!date)continue;
+   const date=rowDate(r);
+   if(!date && ['antiHCV','antiHBs','hbsAg'].includes(hit.key)){
+     const pageDates=(txt().match(/1\d{2}\/\d{2}\/\d{2}/g)||[]);
+     if(pageDates.length)date=pageDates[0];
+   }
+   if(!date)continue;
    let nv=numericAfter(r,hit.ni), val=null, vi=-1;
    if(nv){val=nv.v;vi=nv.i}
    else if(['microAlb','urineCrSpot'].includes(hit.key)){
@@ -199,6 +213,10 @@ function parseLabs(){
        const m=z.match(/^(Negative|Positive|Reactive|Non[- ]?Reactive)\s*(?:\(\s*([0-9.]+)\s*\))?$/i);
        if(m){val=m[2]?`${m[1]}(${m[2]})`:m[1];vi=i;break}
      }
+   }
+   if(val===null && ['antiHCV','antiHBs','hbsAg'].includes(hit.key)){
+     const q=parseHepatitisQualRow(r,hit.ni);
+     if(q){val=q.value;vi=q.vi}
    }
    if(val===null)continue;
    const {lo,hi}=parseRef(r.slice(vi+1));
@@ -492,6 +510,9 @@ function parseKUB(t){
 }
 
 function parseCTAbdomen(t){
+ // Endoscopy reports can coexist in the same HIS DOM with old CT rows.
+ // Never let the current Upper GI / colonoscopy body be attached to CT.
+ if(/上消化道鏡|Upper\s*GI\s*Panendoscopy|Esophagus\s*:|Stomach\s*:|Duodenum\s*:|Gastroesophageal reflux|Colon\s*fiberscopy|大腸纖維鏡|處置\(Procedures\)\s*:\s*polypectomy/i.test(String(t||'')))return;
  const itemRe=/CT\s*(?:\/\s*)?s(?:\+c)?\s*Abd(?:omen)?(?:\.\+?pelvis)?|CT\s+Abdomen|Abd(?:omen)?\s*\+?\s*pelvis.*CT|腹部.*CT/i;
  const date=reportDateBy(itemRe);if(!date)return;
  const joinedRows=rows().map(r=>r.join(' ')).join('\n');if(!itemRe.test(joinedRows))return;
@@ -556,20 +577,53 @@ function parsePlainXRay(t){
  save();
 }
 function parseColonFiberscopy(t){
- const itemRe=/Colon\s*fiberscopy|大腸纖維鏡檢查/i;const date=reportDateBy(itemRe);if(!date)return;
- const hdr=rows().map(r=>r.join(' ')).join('\n');if(!itemRe.test(hdr))return;
- const E=ensureDate(date).endoscopy;const z=String(t);
+ const itemRe=/Colon\s*fiberscopy|大腸纖維鏡檢查|大腸鏡/i;
+ const hdr=rows().map(r=>r.join(' ')).join('\n');
+ const z=String(t||'');
+ // Bind only when the selected report/body itself is clearly colonoscopy,
+ // or the current report header is colonoscopy and the body has endoscopic sections.
+ if(!itemRe.test(hdr) && !/Colonic polyps?|polypectomy|Insertion level|Colon cleansing|混合痔|Mixed hemorrhoids/i.test(z))return;
+ const date=reportDateBy(itemRe);if(!date)return;
+ const E=ensureDate(date).endoscopy;
  const lesions=[...z.matchAll(/\bpolypoid lesion\b/ig)].length;
  const polypectomy=/polypectomy/i.test(z);
  if(polypectomy&&lesions>=4&&lesions<=9)E.colon='大腸息肉切除術(四至九)顆';
  else if(polypectomy&&lesions>0)E.colon=`大腸息肉切除術(${lesions}顆)`;
- else if(/Colonic polyps?/i.test(z))E.colon='Colon fiberscopy: colonic polyps';
- if(/mixed hemorrhoids/i.test(z))E.colonExtra='Mixed hemorrhoids';
+ else if(/Colonic polyps?/i.test(z))E.colon='Colon fiberscopy';
+
+ const ls=z.split(/\r?\n/).map(x=>clean(x)).filter(Boolean);
+ const diagnosis=[],suggestion=[];
+ let sec='';
+ for(let line of ls){
+   if(/^診斷\s*\(Diagnosis\)\s*[:：]?/i.test(line)||/^Diagnosis\s*[:：]?$/i.test(line)){sec='dx';continue}
+   if(/^處置\s*\(Procedures\)|^Procedures\s*[:：]?/i.test(line)){sec='';continue}
+   if(/^併發症\s*\(Complication\)|^Complication\s*[:：]?/i.test(line)){sec='';continue}
+   if(/^建議\s*\(Suggestion\)\s*[:：]?/i.test(line)||/^Suggestion\s*[:：]?/i.test(line)){
+     sec='sg';
+     line=line.replace(/^.*?(?:Suggestion\))?\s*[:：]\s*/i,'').trim();
+     if(line)suggestion.push(line.replace(/^[*•.\-]+\s*/,'').trim());
+     continue;
+   }
+   if(/^註\s*[:：]|^Note\s*[:：]/i.test(line)){sec='';continue}
+   line=line.replace(/^[*•.\-]+\s*/,'').trim();
+   if(!line)continue;
+   if(sec==='dx')diagnosis.push(line);
+   else if(sec==='sg')suggestion.push(line);
+ }
+ E.colonDiagnosis=[...new Set(diagnosis.filter(Boolean))];
+ E.colonSuggestion=[...new Set(suggestion.filter(Boolean))];
+ // Backward compatibility: if old parser only saw hemorrhoids, keep it only when
+ // not already present in Diagnosis.
+ if(/mixed hemorrhoids/i.test(z) && !E.colonDiagnosis.some(x=>/mixed hemorrhoids/i.test(x)))E.colonDiagnosis.push('Mixed hemorrhoids');
  save();
 }
 function parseUpperGI(t){
- const itemRe=/Upper\s*GI\s*Panendoscopy|上消化道.*內視鏡/i;const date=reportDateBy(itemRe);if(!date)return;
- const hdr=rows().map(r=>r.join(' ')).join('\n');if(!itemRe.test(hdr))return;
+ const itemRe=/Upper\s*GI\s*Panendoscopy|上消化道.*內視鏡|上消化道鏡/i;
+ const z0=String(t||'');
+ const hdr=rows().map(r=>r.join(' ')).join('\n');
+ // Current body must look like an Upper GI endoscopy report.
+ if(!/上消化道鏡|Esophagus\s*:|Stomach\s*:|Duodenum\s*:|Gastroesophageal reflux|CLO test/i.test(z0))return;
+ const date=reportDateBy(itemRe);if(!date)return;
  const E=ensureDate(date).endoscopy,z=String(t),out=[];
  let m=z.match(/Gastroesophageal reflux disease,?\s*LA grade\s*([A-D])/i);if(m)out.push(`GERD LA grade ${m[1].toUpperCase()}`);
  if(/Atrophic gastritis/i.test(z))out.push('Atrophic gastritis');
@@ -579,26 +633,36 @@ function parseUpperGI(t){
 }
 function rocDateFromOCR(t){let m=t.match(/\b(20\d{2})[\/.-](\d{1,2})[\/.-](\d{1,2})\b/);if(!m)return null;const y=+m[1]-1911;if(y<=0)return null;return `${y}/${String(+m[2]).padStart(2,'0')}/${String(+m[3]).padStart(2,'0')}`}
 function ecgParseText(t){
- const z=String(t||'').replace(/\r/g,'\n');const E={};let m;
- if(m=z.match(/(?:^|\n|\s)Rate\s*[:=]?\s*(\d{2,3})\b/i))E.hr=m[1];
- if(m=z.match(/(?:^|\n|\s)PR\s*[:=]?\s*(\d{2,3})\b/i))E.pr=m[1];
- if(m=z.match(/QRSd?\s*[:=]?\s*(\d{2,3})\b/i))E.qrs=m[1];
- if(m=z.match(/(?:^|\n|\s)QT\s*[:=]?\s*(\d{2,3})\b/i))E.qt=m[1];
- if(m=z.match(/QTc\s*[:=]?\s*(\d{2,3})\b/i))E.qtc=m[1];
- if(m=z.match(/(?:^|\n)\s*P\s+(\-?\d{1,3})\b/im))E.paxis=m[1];
- if(m=z.match(/(?:^|\n)\s*QRS\s+(\-?\d{1,3})\b/im))E.qrsaxis=m[1];
- if(m=z.match(/(?:^|\n)\s*T\s+(\-?\d{1,3})\b/im))E.taxis=m[1];
- if(/Sinus\s+rhythm/i.test(z))E.rhythm='Sinus rhythm';
- if(/borderline\s+right\s+axis\s+deviation/i.test(z))E.rad='borderline right axis deviation';
- else if(/right\s+axis\s+deviation/i.test(z))E.rad='right axis deviation';
- if(/consider\s+left\s+ventricular\s+hypertrophy/i.test(z))E.lvh='consider LVH';
- else if(/left\s+ventricular\s+hypertrophy/i.test(z))E.lvh='LVH';
- if(/ST\s*elev[^\n]{0,80}(?:early\s+repol|early\s+repolarization)/i.test(z))E.st='ST elevation, probable normal early repolarization pattern';
- else if(/ST\s+elevation/i.test(z))E.st='ST elevation';
+ const z=String(t||'').replace(/\r/g,'\n');
+ const one=z.replace(/[.·]{2,}/g,' ').replace(/[ \t]+/g,' ');
+ const E={};let m;
+ const num=rx=>{const q=one.match(rx);return q?q[1]:null};
+ const hr=num(/(?:^|\n|\s)(?:Rate|HR|Heart\s*Rate)\s*[:=]?\s*(\d{2,3})\b/i);
+ const pr=num(/(?:^|\n|\s)PR\s*[:=]?\s*(\d{2,3})\b/i);
+ const qrs=num(/(?:^|\n|\s)QRS(?:d|D| duration)?\s*[:=]?\s*(\d{2,3})\b/i);
+ const qt=num(/(?:^|\n|\s)QT(?!c)\s*[:=]?\s*(\d{2,3})\b/i);
+ const qtc=num(/(?:^|\n|\s)QTc\s*[:=]?\s*(\d{2,3})\b/i);
+ if(hr)E.hr=hr;if(pr)E.pr=pr;if(qrs)E.qrs=qrs;if(qt)E.qt=qt;if(qtc)E.qtc=qtc;
+ if(m=z.match(/(?:^|\n)\s*P\s+(-?\d{1,3})\b/im))E.paxis=m[1];
+ if(m=z.match(/(?:^|\n)\s*QRS\s+(-?\d{1,3})\b/im))E.qrsaxis=m[1];
+ if(m=z.match(/(?:^|\n)\s*T\s+(-?\d{1,3})\b/im))E.taxis=m[1];
+ if(/Sinus\s+rhythm/i.test(one))E.rhythm='Sinus rhythm';
+ else if(/Sinus\s+bradycardia/i.test(one))E.rhythm='Sinus bradycardia';
+ else if(/Sinus\s+tachycardia/i.test(one))E.rhythm='Sinus tachycardia';
+ if(/Ventricular\s+premature\s+complex/i.test(one))E.vpc='Ventricular premature complex';
+ if(m=one.match(/Abnormal\s+R[- ]?wave\s+progression[^;\n]*/i))E.rwave=m[0].trim();
+ if(m=one.match(/Borderline\s+ST\s+elevation[^;\n]*/i))E.st=m[0].trim();
+ else if(/ST\s*elev[^\n]{0,100}(?:early\s+repol|early\s+repolarization)/i.test(one))E.st='ST elevation, probable normal early repolarization pattern';
+ else if(/ST\s+elevation/i.test(one))E.st='ST elevation';
+ if(/borderline\s+right\s+axis\s+deviation/i.test(one))E.rad='borderline right axis deviation';
+ else if(/right\s+axis\s+deviation/i.test(one))E.rad='right axis deviation';
+ if(/consider\s+left\s+ventricular\s+hypertrophy/i.test(one))E.lvh='consider LVH';
+ else if(/left\s+ventricular\s+hypertrophy/i.test(one))E.lvh='LVH';
+ if(/Baseline\s+wander/i.test(one))E.wander='Baseline wander';
  const date=rocDateFromOCR(z);
  return {date,E};
 }
-function storeECGText(t){const {date,E}=ecgParseText(t);const dte=date||reportDateBy(/EKG|ECG|心電圖/i)||Object.keys(S.byDate).sort((a,b)=>dateKey(b)-dateKey(a))[0];if(!dte||!Object.keys(E).length)return false;Object.assign(ensureDate(dte).ecg,E);save();return true}
+function storeECGText(t,explicitDate){const {date,E}=ecgParseText(t);const dte=explicitDate||date||reportDateBy(/EKG|ECG|心電圖/i);if(!dte||!Object.keys(E).length)return false;Object.assign(ensureDate(dte).ecg,E);save();return true}
 function bodyCompDateFromOCR(t){
  const z=String(t||'');
  let m=z.match(/\b(20\d{2})[\/.\-](\d{1,2})[\/.\-](\d{1,2})\b/);
@@ -645,7 +709,18 @@ async function cropOCR(T,dataUrl,x0,y0,x1,y1){
 function numsFromOCR(t){
  return (String(t||'').match(/\d+(?:\.\d+)?/g)||[]).map(Number).filter(Number.isFinite);
 }
+
+function qcheckReportROCDate(raw){
+ const z=String(raw||'').replace(/\r/g,' ');
+ // Prefer explicit Gregorian date on QCheck report, e.g. 2026/8/11 or 2026/08/11.
+ const m=z.match(/\b(20\d{2})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\b/);
+ if(!m)return '';
+ const y=Number(m[1])-1911;
+ if(y<=0)return '';
+ return `${y}/${String(m[2]).padStart(2,'0')}/${String(m[3]).padStart(2,'0')}`;
+}
 async function parseQCheckImage(T,dataUrl,fullText){
+ const reportDate=qcheckReportROCDate(fullText);
  // QCheck Report Summary has a fixed layout. OCR each measurement row separately,
  // avoiding the ideal-range and target columns.
  const extra={};
@@ -655,6 +730,14 @@ async function parseQCheckImage(T,dataUrl,fullText){
      return a.find(v=>v>=min&&v<=max);
    }catch(e){return null}
  };
+ // If fullText did not include the report date, OCR the upper-right date box.
+ let qDate=reportDate;
+ if(!qDate){
+   try{
+     const dt=await cropOCR(T,dataUrl,.69,.055,.96,.105);
+     qDate=qcheckReportROCDate(dt);
+   }catch(e){}
+ }
  // Left "測量結果" column (based on the QCheck Report Summary layout)
  const rows=[
    ['BW', .205,.210,.305,.238, 25,250],
@@ -693,11 +776,20 @@ async function parseQCheckImage(T,dataUrl,fullText){
    }catch(e){}
  }
  if(Object.keys(extra).length<3)return false;
- return storeInBodyOCR(fullText,extra);
+ return storeInBodyOCR(fullText,extra,qDate||reportDate);
 }
 async function loadTesseract(){
  if(window.Tesseract?.recognize)return window.Tesseract;
  return await new Promise((resolve,reject)=>{const old=document.getElementById('__aclTesseract');if(old){let n=0;const tm=setInterval(()=>{if(window.Tesseract?.recognize){clearInterval(tm);resolve(window.Tesseract)}else if(++n>40){clearInterval(tm);reject(new Error('OCR engine did not load'))}},250);return}const s=document.createElement('script');s.id='__aclTesseract';s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=()=>window.Tesseract?.recognize?resolve(window.Tesseract):reject(new Error('OCR engine unavailable'));s.onerror=()=>reject(new Error('HIS blocked the OCR engine'));document.head.appendChild(s)})
+}
+async function cropECGHeader(dataUrl,threshold=false){
+ return await new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>{try{
+  const h=Math.max(260,Math.floor(im.height*.34)),scale=3,c=document.createElement('canvas');
+  c.width=im.width*scale;c.height=h*scale;const x=c.getContext('2d');x.imageSmoothingEnabled=false;
+  x.drawImage(im,0,0,im.width,h,0,0,c.width,c.height);
+  if(threshold){const id=x.getImageData(0,0,c.width,c.height),p=id.data;for(let i=0;i<p.length;i+=4){const y=.299*p[i]+.587*p[i+1]+.114*p[i+2],q=y<195?0:255;p[i]=p[i+1]=p[i+2]=q}x.putImageData(id,0,0)}
+  resolve(c)
+ }catch(e){reject(e)}};im.onerror=reject;im.src=dataUrl})
 }
 async function preprocessECG(dataUrl){return await new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>{try{const cropH=Math.max(220,Math.floor(im.height*0.34));const scale=2,c=document.createElement('canvas');c.width=im.width*scale;c.height=cropH*scale;const x=c.getContext('2d');x.drawImage(im,0,0,im.width,cropH,0,0,c.width,c.height);const id=x.getImageData(0,0,c.width,c.height),p=id.data;for(let i=0;i<p.length;i+=4){let y=0.299*p[i]+0.587*p[i+1]+0.114*p[i+2];y=y<180?0:255;p[i]=p[i+1]=p[i+2]=y}x.putImageData(id,0,0);resolve(c)}catch(e){reject(e)}};im.onerror=reject;im.src=dataUrl})}
 
@@ -760,17 +852,21 @@ function formatGroup(g){
  if(CT.abdomen?.length){const z=CT.abdomen.map(x=>clean(x)).filter(Boolean);if(z.length)lines.push('• CT Abdomen: '+z.join('; '))}
  if(XR.lower?.length){const z=XR.lower.map(x=>clean(x).replace(/^[*•.\-\s]+/,'').trim()).filter(Boolean);if(z.length)lines.push('• X-ray Knee/Pelvis: '+z.join('; '))}
  for(const [k,label] of [['cspine','C-spine'],['wrist','Wrist'],['elbow','Elbow'],['forearm','Forearm']])if(XR[k]?.length){const z=XR[k].map(clean).filter(Boolean);if(z.length)lines.push(`• X-ray ${label}: `+z.join('; '))}
- if(ENDO.colon){let z=ENDO.colon;if(ENDO.colonExtra)z+='; '+ENDO.colonExtra;lines.push('• '+z)}
+ if(ENDO.colon){
+   let z=ENDO.colon;
+   if(ENDO.colonDiagnosis?.length)z+=': '+ENDO.colonDiagnosis.join('; ');
+   if(ENDO.colonSuggestion?.length)z+='; Suggestion: '+ENDO.colonSuggestion.join('; ');
+   lines.push('• '+z)
+ }
  if(ENDO.ugi?.length)lines.push('• Upper GI panendoscopy: '+ENDO.ugi.join('; '))
- if(Object.keys(ECG).length){const p=[];if(ECG.rhythm)p.push(ECG.rhythm);if(ECG.hr)p.push(`HR ${ECG.hr} bpm`);if(ECG.pr)p.push(`PR ${ECG.pr} ms`);if(ECG.qrs)p.push(`QRS ${ECG.qrs} ms`);if(ECG.qt&&ECG.qtc)p.push(`QT/QTc ${ECG.qt}/${ECG.qtc} ms`);else{if(ECG.qt)p.push(`QT ${ECG.qt} ms`);if(ECG.qtc)p.push(`QTc ${ECG.qtc} ms`)}if(ECG.rad)p.push(ECG.rad);if(ECG.lvh)p.push(ECG.lvh);if(ECG.st)p.push(ECG.st);if(p.length)lines.push('• ECG: '+p.join('; '))}
+ if(Object.keys(ECG).length){const p=[];if(ECG.hr)p.push(`HR ${ECG.hr} bpm`);if(ECG.pr)p.push(`PR ${ECG.pr} ms`);if(ECG.qrs)p.push(`QRS ${ECG.qrs} ms`);if(ECG.qt)p.push(`QT ${ECG.qt} ms`);if(ECG.qtc)p.push(`QTc ${ECG.qtc} ms`);if(ECG.rhythm)p.push(ECG.rhythm);if(ECG.vpc)p.push(ECG.vpc);if(ECG.rwave)p.push(ECG.rwave);if(ECG.rad)p.push(ECG.rad);if(ECG.lvh)p.push(ECG.lvh);if(ECG.st)p.push(ECG.st);if(ECG.wander)p.push(ECG.wander);if(p.length)lines.push('• EKG: '+p.join('; '))}
  return lines;
 }
 function dateKey(d){const p=d.split('/').map(Number);return p[0]*10000+p[1]*100+p[2]}
 function fmt(){
-try{if(window.__aclECGSummary)lines.push(window.__aclECGSummary)}catch(e){}
 parseAll();const dates=Object.keys(S.byDate).filter(d=>formatGroup(S.byDate[d]).length).sort((a,b)=>dateKey(b)-dateKey(a));return dates.map(d=>`${d}\n${formatGroup(S.byDate[d]).join('\n')}`).join('\n\n')}
 const d=document.createElement('div');d.id=ID;d.style='position:fixed;z-index:2147483647;right:12px;top:12px;width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;background:#fff;color:#243746;border:1px solid #ccd3db;border-radius:14px;box-shadow:0 12px 40px #0004;padding:14px;font:14px Arial,sans-serif';
-d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.7.9</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。以完報日為唯一日期基準（不使用看診日／診療日／開單日）；新增 CT Abdomen / UACR formula / PSA；離線 Bookmarklet 安裝修正；Urine 僅限尿液檢驗區塊讀取；新增 spot urine chemistry；UACR/UPCR 可由 spot urine 自動計算；新增 KUB；Stool routine；hs-Troponin I/T；Urine routine 細項；C-spine / wrist / elbow / knee / forearm X-ray；Colon fiberscopy；Upper GI panendoscopy；Abdomen + pelvis CT 分類；FBG AC/PC；NT-proBNP；排除生日等非完報日期誤讀；Urine RBC/WBC 僅限尿液檢體；新增腹部超音波；RPR/VDRL；更新尿液檢驗另一套命名格式；檢查清單未點選時保持空白；新增 Echo for Others；下肢/膝/骨盆同份 X-ray 報告合併去重；Windows 截圖改為 HIS 頁面直接 Ctrl+V，不再開啟 screen_capture.html；支援 EKG / InBody 截圖預覽與可用時 OCR；Spot urine 加入 MicroAlbumin；新增頭頸部軟組織超音波；QCheck Report Summary 固定版型截圖可讀取 BW/BMI/PBF/BFM/SMM/VFA；新增 HBsAg / Anti-HBs / Anti-HCV。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
+d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.8.3</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。以完報日為唯一日期基準（不使用看診日／診療日／開單日）；新增 CT Abdomen / UACR formula / PSA；離線 Bookmarklet 安裝修正；Urine 僅限尿液檢驗區塊讀取；新增 spot urine chemistry；UACR/UPCR 可由 spot urine 自動計算；新增 KUB；Stool routine；hs-Troponin I/T；Urine routine 細項；C-spine / wrist / elbow / knee / forearm X-ray；Colon fiberscopy；Upper GI panendoscopy；Abdomen + pelvis CT 分類；FBG AC/PC；NT-proBNP；排除生日等非完報日期誤讀；Urine RBC/WBC 僅限尿液檢體；新增腹部超音波；RPR/VDRL；更新尿液檢驗另一套命名格式；檢查清單未點選時保持空白；新增 Echo for Others；下肢/膝/骨盆同份 X-ray 報告合併去重；Windows 截圖改為 HIS 頁面直接 Ctrl+V，不再開啟 screen_capture.html；支援 EKG / InBody 截圖預覽與可用時 OCR；Spot urine 加入 MicroAlbumin；新增頭頸部軟組織超音波；QCheck Report Summary 固定版型截圖可讀取 BW/BMI/PBF/BFM/SMM/VFA；新增 HBsAg / Anti-HBs / Anti-HCV；初報且完報時間空白時亦可讀取；修正 Upper GI 不再誤接至 CT；Colon fiberscopy 加入 Diagnosis / Suggestion。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
 const R=d.querySelector('#aR'),DET=d.querySelector('#aD');function draw(){const t=txt();const det=/\b住院\b/.test(t)?'IPD':/\b門診\b|\b急診\b/.test(t)?'OPD':'?';DET.textContent='Detected: '+det;const view=clinicalView();if(!view){R.textContent='';return}if(view==='REPORT'&&!hasActiveReportBody()){R.textContent='';return}R.textContent=fmt()}
 let tm;const sch=()=>{clearTimeout(tm);tm=setTimeout(draw,250)};addEventListener('scroll',sch,{passive:true});new MutationObserver(sch).observe(document.body,{subtree:true,childList:true,characterData:true});
 const MSG=d.querySelector('#aMsg'),CAP=d.querySelector('#aCap'),IMG=d.querySelector('#aImg');const setMsg=(s,bad=false)=>{MSG.textContent=s;MSG.style.color=bad?'#b42318':'#667085'};const showCapture=dataUrl=>{if(!dataUrl)return;IMG.src=dataUrl;CAP.style.display='block';setMsg('截圖已貼上 ✓')};
@@ -790,10 +886,12 @@ async function ocrCapturedImage(dataUrl){
      ok=storeInBodyOCR(text);label='InBody';
    }
    if(!ok){
-     const c=await preprocessECG(dataUrl);
-     const ecgOut=await T.recognize(c,'eng');
-     const ecgText=ecgOut?.data?.text||text;
-     ok=storeECGText(ecgText);label='ECG';
+     setMsg('辨識 EKG 報告日期與上方數值中…');
+     const h1=await cropECGHeader(dataUrl,false),h2=await cropECGHeader(dataUrl,true);
+     const o1=await T.recognize(h1,'eng'),o2=await T.recognize(h2,'eng');
+     const ecgText=[text,o1?.data?.text||'',o2?.data?.text||''].join('\n');
+     const reportDate=rocDateFromOCR(ecgText);
+     ok=storeECGText(ecgText,reportDate);label='EKG';
    }
    if(ok){draw();setMsg(`${label} OCR 完成 ✓ 已加入 summary。`)}
    else setMsg('截圖已貼上 ✓；未自動辨識到 ECG / InBody 欄位，預覽仍保留。',false);
