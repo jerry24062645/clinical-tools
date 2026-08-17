@@ -1,5 +1,5 @@
 (()=>{
-const ID='__acl644', KEY='__acl677cache';
+const ID='__acl644', KEY='__acl679cache';
 if(document.getElementById(ID)){document.getElementById(ID).remove();return}
 let S={byDate:{},mode:'AUTO'};try{S={...S,...JSON.parse(sessionStorage.getItem(KEY)||'{}')}}catch(e){}
 if(!S.byDate||typeof S.byDate!=='object')S.byDate={};
@@ -150,9 +150,10 @@ const aliases={
  wbc:/白血球計數WBC|白血球WBC|^WBC$/i,rbc:/紅血球RBC|^RBC$/i,hb:/血色素Hemoglobin|血紅素HGB|^Hemoglobin$|^HGB$|^Hb$/i,hct:/血球容積比HCT|^HCT$/i,mcv:/紅血球平均體積MCV|^MCV$/i,mch:/平均血紅素量MCH|^MCH$/i,mchc:/平均血色素濃度MCHC|^MCHC$/i,plt:/血小板計數Platelet|^Platelet$/i,
  uacr:/Microalbumin\/Cr urine ratio|Microalbumin\/Cr|^UACR$/i,upcr:/^UPCR$|TP\/Cr urine ratio|Urine total protein\/creatinine/i,urineTP:/TP-spot urine|Total protein-Urine/i,microAlb:/^MicroAlbumin$|MicroAlbumin\(尿\)/i,urineCrSpot:/Crea-spot urine|Cre-Spot Urine/i,spotMg:/Mg-spot urine/i,spotCl:/Cl-spot urine/i,spotK:/K-spot urine/i,spotNa:/Na-spot urine/i,spotUA:/UA-spot urine/i,spotP:/Urine-P|P\s*磷-SPOT URINE/i,spotCa:/Ca-spot urine/i,spotBUN:/BUN\(尿\)/i,urineOsm:/Urine-osmolarity test|URINE-OSMOLARITY TEST|尿滲透壓/i,psa:/^PSA$/i,
  pra:/Renin activity|^PRA$/i,pac:/^Aldosterone$|^PAC$/i,
+ antiHCV:/^Anti[- ]?HCV$/i,antiHBs:/^Anti[- ]?HBs$/i,hbsAg:/^HBsAg$/i,
  aptt:/^APTT$|^aPTT$/i,pt:/^Prothrombin time$|^PT$/i,inr:/^INR$/i
 };
-const units={hba1c:'%',eag:'mg/dL',gluAC:'mg/dL',gluPC:'mg/dL',fbgAC:'mg/dL',fbgPC:'mg/dL',tc:'mg/dL',tg:'mg/dL',hdl:'mg/dL',ldl:'mg/dL',ua:'mg/dL',bun:'mg/dL',cr:'mg/dL',egfr:'',ast:'U/L',alt:'U/L',alp:'U/L',ggt:'U/L',ldh:'U/L',tbil:'mg/dL',dbil:'mg/dL',alb:'g/dL',na:'mmol/L',k:'mmol/L',cl:'mmol/L',ca:'mg/dL',mg:'mg/dL',p:'mg/dL',crp:'mg/dL',pct:'ng/mL',lactate:'mg/dL',ntprobnp:'pg/mL',rpr:'',hsTnI:'ng/L',hsTnT:'ng/L',amylase:'U/L',lipase:'U/L',ddimer:'ng/mL',tsh:'uIU/mL',ft4:'ng/dL',t3:'ng/mL',wbc:'10^3/uL',rbc:'10^6/uL',hb:'g/dL',hct:'%',mcv:'fL',mch:'pg',mchc:'g/dL',plt:'10^3/uL',uacr:'mg/g',upcr:'mg/g',urineTP:'mg/L',microAlb:'mg/L',urineCrSpot:'mg/L',spotMg:'mg/dL',spotCl:'mmol/L',spotK:'mmol/L',spotNa:'mmol/L',spotUA:'mg/dL',spotP:'mg/dL',spotCa:'mg/dL',spotBUN:'mg/dL',urineOsm:'mOsm/kg',psa:'ng/mL',pra:'ng/mL/hr',pac:'ng/dL',aptt:'sec',pt:'sec',inr:''};
+const units={hba1c:'%',eag:'mg/dL',gluAC:'mg/dL',gluPC:'mg/dL',fbgAC:'mg/dL',fbgPC:'mg/dL',tc:'mg/dL',tg:'mg/dL',hdl:'mg/dL',ldl:'mg/dL',ua:'mg/dL',bun:'mg/dL',cr:'mg/dL',egfr:'',ast:'U/L',alt:'U/L',alp:'U/L',ggt:'U/L',ldh:'U/L',tbil:'mg/dL',dbil:'mg/dL',alb:'g/dL',na:'mmol/L',k:'mmol/L',cl:'mmol/L',ca:'mg/dL',mg:'mg/dL',p:'mg/dL',crp:'mg/dL',pct:'ng/mL',lactate:'mg/dL',ntprobnp:'pg/mL',rpr:'',hsTnI:'ng/L',hsTnT:'ng/L',amylase:'U/L',lipase:'U/L',ddimer:'ng/mL',tsh:'uIU/mL',ft4:'ng/dL',t3:'ng/mL',wbc:'10^3/uL',rbc:'10^6/uL',hb:'g/dL',hct:'%',mcv:'fL',mch:'pg',mchc:'g/dL',plt:'10^3/uL',uacr:'mg/g',upcr:'mg/g',urineTP:'mg/L',microAlb:'mg/L',urineCrSpot:'mg/L',spotMg:'mg/dL',spotCl:'mmol/L',spotK:'mmol/L',spotNa:'mmol/L',spotUA:'mg/dL',spotP:'mg/dL',spotCa:'mg/dL',spotBUN:'mg/dL',urineOsm:'mOsm/kg',psa:'ng/mL',antiHCV:'COI',antiHBs:'IU/L',hbsAg:'COI',pra:'ng/mL/hr',pac:'ng/dL',aptt:'sec',pt:'sec',inr:''};
 function parseRPR(){
  let changed=false;
  const sectionDate=reportDateBy(/RPR\/VDRL test|Rapid Plasma Reagin|\bRPR\b|\bVDRL\b/i);
@@ -192,9 +193,16 @@ function parseLabs(){
        if(/^(?:<|≤|>|≥)?\s*\d+(?:\.\d+)?$/.test(z)){val=z.replace(/\s+/g,'');vi=i;break}
      }
    }
+   if(val===null && ['antiHCV','antiHBs','hbsAg'].includes(hit.key)){
+     for(let i=hit.ni+1;i<r.length;i++){
+       const z=clean(r[i]);
+       const m=z.match(/^(Negative|Positive|Reactive|Non[- ]?Reactive)\s*(?:\(\s*([0-9.]+)\s*\))?$/i);
+       if(m){val=m[2]?`${m[1]}(${m[2]})`:m[1];vi=i;break}
+     }
+   }
    if(val===null)continue;
    const {lo,hi}=parseRef(r.slice(vi+1));
-   const g=ensureDate(date); let fv=flag(val,lo,hi);
+   const g=ensureDate(date); let fv=['antiHCV','antiHBs','hbsAg'].includes(hit.key)?String(val):flag(val,lo,hi);
    if(hit.key==='upcr' && /TP\/Cr urine ratio|Urine total protein\/creatinine/i.test(hit.name)){
       const x=parseFloat(String(val));
       if(Number.isFinite(x)){const mgG=x*1000;fv=(mgG>=150?'H ':'')+String(Number(mgG.toFixed(1)));val=String(Number(mgG.toFixed(1)));}
@@ -716,6 +724,7 @@ function formatGroup(g){
  a=[];if(v(L,'amylase'))a.push(`Amylase ${v(L,'amylase')} U/L`);if(v(L,'lipase'))a.push(`Lipase ${v(L,'lipase')} U/L`);if(a.length)lines.push('• '+a.join('; '));
  a=[];if(v(L,'ft4'))a.push(`FT4 ${v(L,'ft4')} ng/dL`);if(v(L,'tsh'))a.push(`TSH ${v(L,'tsh')} uIU/mL`);if(v(L,'t3'))a.push(`T3 ${v(L,'t3')} ng/mL`);if(a.length)lines.push('• TFT: '+a.join('; '));
  if(v(L,'psa'))lines.push(`• PSA ${v(L,'psa')} ng/mL`);
+ a=[];if(v(L,'hbsAg'))a.push(`HBsAg ${v(L,'hbsAg')}`);if(v(L,'antiHBs'))a.push(`Anti-HBs ${v(L,'antiHBs')}`);if(v(L,'antiHCV'))a.push(`Anti-HCV ${v(L,'antiHCV')}`);if(a.length)lines.push('• Hepatitis: '+a.join('; '));
  if(v(L,'pra')||v(L,'pac')){a=[];if(v(L,'pra'))a.push(`PRA ${v(L,'pra')} ng/mL/hr`);if(v(L,'pac'))a.push(`PAC ${v(L,'pac')} ng/dL`);lines.push('• '+a.join('; '))}
  if(v(L,'aptt')||v(L,'pt')||v(L,'inr')){a=[];if(v(L,'pt'))a.push(`PT ${v(L,'pt')} sec`);if(v(L,'inr'))a.push(`INR ${v(L,'inr')}`);if(v(L,'aptt'))a.push(`aPTT ${v(L,'aptt')} sec`);lines.push('• Coag: '+a.join('; '))}
  {
@@ -734,7 +743,7 @@ function formatGroup(g){
    if(v(L,'urineOsm'))sp.push(`Osm ${v(L,'urineOsm')} mOsm/kg`);
    if(sp.length)lines.push('• Spot urine: '+sp.join('; '));
  }
- if(Object.keys(U).length){const p=[],labels={color:'Color',clarity:'Clarity',glu:'Glu',pro:'PRO',ket:'Ket',ob:'OB',nit:'Nit',le:'LE',uro:'Uro',bil:'BIL',rbc:'RBC',wbc:'WBC',ep:'EP cell',bacteria:'Bacteria',cast:'Cast',crystal:'Crystal',mucus:'Mucus',parasite:'Parasite',yeast:'Yeast/Fungi',sg:'Sp.gr',ph:'pH'};for(const k of ['color','clarity','glu','pro','ket','ob','nit','le','uro','bil','rbc','wbc','ep','bacteria','cast','crystal','mucus','parasite','yeast','sg','ph'])if(U[k]!==undefined){let z=U[k];if(['rbc','wbc','ep','bacteria'].includes(k)&&/^\d+\s*[-~]\s*\d+$/i.test(z))z=z.replace(/\s*~\s*/,'-')+'/HPF';if(['cast','mucus'].includes(k)&&/^\d+\s*[-~]\s*\d+$/i.test(z))z=z.replace(/\s*~\s*/,'-')+'/LPF';p.push(`${labels[k]} ${z}`)}if(p.length)lines.push('• Urine: '+p.join('; '))}
+ if(Object.keys(U).length){const p=[],labels={glu:'Glu',pro:'PRO',ket:'Ket',ob:'OB',nit:'Nit',le:'LE',uro:'Uro',bil:'BIL',rbc:'RBC',wbc:'WBC',ep:'EP cell',bacteria:'Bacteria',cast:'Cast',crystal:'Crystal',mucus:'Mucus',parasite:'Parasite',yeast:'Yeast/Fungi',sg:'Sp.gr',ph:'pH'};for(const k of ['color','clarity','glu','pro','ket','ob','nit','le','uro','bil','rbc','wbc','ep','bacteria','cast','crystal','mucus','parasite','yeast','sg','ph'])if(U[k]!==undefined){let z=String(U[k]).trim();if(k==='glu'){if(/^(negative|neg|-|\(-\))$/i.test(z))z='Neg';else if(/^(positive|pos|\+|\(\+\))$/i.test(z))z='(+)' }else if(['pro','ket','ob','nit','le','uro','bil','bacteria','crystal','mucus','parasite','yeast'].includes(k)){if(/^(negative|neg|-|\(-\))$/i.test(z))z='(-)';else if(/^(positive|pos|\+|\(\+\))$/i.test(z))z='(+)' }if(['rbc','wbc','ep','bacteria'].includes(k)&&/^\d+\s*[-~]\s*\d+$/i.test(z))z=z.replace(/\s*~\s*/,'-')+'/HPF';if(['cast','mucus'].includes(k)&&/^\d+\s*[-~]\s*\d+$/i.test(z))z=z.replace(/\s*~\s*/,'-')+'/LPF';p.push((k==='color'||k==='clarity')?z:`${labels[k]} ${z}`)}if(p.length)lines.push('• Urine: '+p.join('; '))}
  if(Object.keys(BG).length){a=[];for(const [k,label,unit] of [['ph','pH',''],['pco2','pCO2',' mmHg'],['hco3','HCO3',' mmol/L'],['be','BE',' mmol/L'],['po2','pO2',' mmHg'],['so2','sO2','%']])if(BG[k])a.push(`${label} ${BG[k]}${unit}`);if(a.length)lines.push(`• ${BG.type||'Blood gas'}: `+a.join('; '))}
  if(SP.bloodKetone)lines.push(`• Ketone ${SP.bloodKetone}`);
  if(SP.covidAg||SP.fluA||SP.fluB){a=[];if(SP.covidAg)a.push(`SARS-CoV-2 Ag ${SP.covidAg}`);if(SP.fluA)a.push(`Flu A ${SP.fluA}`);if(SP.fluB)a.push(`Flu B ${SP.fluB}`);lines.push('• Viral: '+a.join('; '))}
@@ -761,7 +770,7 @@ function fmt(){
 try{if(window.__aclECGSummary)lines.push(window.__aclECGSummary)}catch(e){}
 parseAll();const dates=Object.keys(S.byDate).filter(d=>formatGroup(S.byDate[d]).length).sort((a,b)=>dateKey(b)-dateKey(a));return dates.map(d=>`${d}\n${formatGroup(S.byDate[d]).join('\n')}`).join('\n\n')}
 const d=document.createElement('div');d.id=ID;d.style='position:fixed;z-index:2147483647;right:12px;top:12px;width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;background:#fff;color:#243746;border:1px solid #ccd3db;border-radius:14px;box-shadow:0 12px 40px #0004;padding:14px;font:14px Arial,sans-serif';
-d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.7.7</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。以完報日為唯一日期基準（不使用看診日／診療日／開單日）；新增 CT Abdomen / UACR formula / PSA；離線 Bookmarklet 安裝修正；Urine 僅限尿液檢驗區塊讀取；新增 spot urine chemistry；UACR/UPCR 可由 spot urine 自動計算；新增 KUB；Stool routine；hs-Troponin I/T；Urine routine 細項；C-spine / wrist / elbow / knee / forearm X-ray；Colon fiberscopy；Upper GI panendoscopy；Abdomen + pelvis CT 分類；FBG AC/PC；NT-proBNP；排除生日等非完報日期誤讀；Urine RBC/WBC 僅限尿液檢體；新增腹部超音波；RPR/VDRL；更新尿液檢驗另一套命名格式；檢查清單未點選時保持空白；新增 Echo for Others；下肢/膝/骨盆同份 X-ray 報告合併去重；Windows 截圖改為 HIS 頁面直接 Ctrl+V，不再開啟 screen_capture.html；支援 EKG / InBody 截圖預覽與可用時 OCR；Spot urine 加入 MicroAlbumin；新增頭頸部軟組織超音波；QCheck Report Summary 固定版型截圖可讀取 BW/BMI/PBF/BFM/SMM/VFA。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
+d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.7.9</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。以完報日為唯一日期基準（不使用看診日／診療日／開單日）；新增 CT Abdomen / UACR formula / PSA；離線 Bookmarklet 安裝修正；Urine 僅限尿液檢驗區塊讀取；新增 spot urine chemistry；UACR/UPCR 可由 spot urine 自動計算；新增 KUB；Stool routine；hs-Troponin I/T；Urine routine 細項；C-spine / wrist / elbow / knee / forearm X-ray；Colon fiberscopy；Upper GI panendoscopy；Abdomen + pelvis CT 分類；FBG AC/PC；NT-proBNP；排除生日等非完報日期誤讀；Urine RBC/WBC 僅限尿液檢體；新增腹部超音波；RPR/VDRL；更新尿液檢驗另一套命名格式；檢查清單未點選時保持空白；新增 Echo for Others；下肢/膝/骨盆同份 X-ray 報告合併去重；Windows 截圖改為 HIS 頁面直接 Ctrl+V，不再開啟 screen_capture.html；支援 EKG / InBody 截圖預覽與可用時 OCR；Spot urine 加入 MicroAlbumin；新增頭頸部軟組織超音波；QCheck Report Summary 固定版型截圖可讀取 BW/BMI/PBF/BFM/SMM/VFA；新增 HBsAg / Anti-HBs / Anti-HCV。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
 const R=d.querySelector('#aR'),DET=d.querySelector('#aD');function draw(){const t=txt();const det=/\b住院\b/.test(t)?'IPD':/\b門診\b|\b急診\b/.test(t)?'OPD':'?';DET.textContent='Detected: '+det;const view=clinicalView();if(!view){R.textContent='';return}if(view==='REPORT'&&!hasActiveReportBody()){R.textContent='';return}R.textContent=fmt()}
 let tm;const sch=()=>{clearTimeout(tm);tm=setTimeout(draw,250)};addEventListener('scroll',sch,{passive:true});new MutationObserver(sch).observe(document.body,{subtree:true,childList:true,characterData:true});
 const MSG=d.querySelector('#aMsg'),CAP=d.querySelector('#aCap'),IMG=d.querySelector('#aImg');const setMsg=(s,bad=false)=>{MSG.textContent=s;MSG.style.color=bad?'#b42318':'#667085'};const showCapture=dataUrl=>{if(!dataUrl)return;IMG.src=dataUrl;CAP.style.display='block';setMsg('截圖已貼上 ✓')};
