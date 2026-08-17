@@ -1,4 +1,4 @@
-# Clinical Tools v6.5.2
+# Clinical Tools v6.5.3
 
 Auto Clinical Lab Bookmarklet。
 
@@ -8,9 +8,11 @@ Auto Clinical Lab Bookmarklet。
 - OCR 使用 Tesseract.js，在瀏覽器端處理影像，不上傳 ECG 圖片
 
 
-v6.5.2：新增凝血功能 aPTT / PT / INR 自動讀取與 H/L 標記。
+v6.5.3：新增凝血功能 aPTT / PT / INR 自動讀取與 H/L 標記。
 
 
-- v6.5.2：日期歸檔以完報日為主，不使用看診日／診療日／開單日時。
+- v6.5.3：日期歸檔以完報日為主，不使用看診日／診療日／開單日時。
 
-- v6.5.2：新增 SARS-CoV-2 Ag、Flu A rapid PCR、Flu B rapid PCR 自動讀取。
+- v6.5.3：新增 SARS-CoV-2 Ag、Flu A rapid PCR、Flu B rapid PCR 自動讀取。
+
+- v6.5.3：新增 CT s+c Abdomen findings、PSA、UACR 以 MicroAlbumin / Crea-spot urine ×1000 計算（mg/g）。
