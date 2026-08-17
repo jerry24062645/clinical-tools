@@ -1,17 +1,13 @@
-# Auto Clinical Lab v6.8.3
+# Auto Clinical Lab v6.8.4
 
 ## 本版修正
-- EKG OCR 改為原圖 + 上方報告區原色 + 上方報告區二值化，共三份 OCR 結果合併。
-- EKG 日期以報告本身印出的西元日期為主，再換算民國年。
-- `2026/8/17` → `115/08/17`。
-- 加強 Rate / PR / QRS / QT / QTc。
-- 加強 Sinus rhythm、Ventricular premature complex、Abnormal R-wave progression、Borderline ST elevation、Baseline wander。
+- 修正安裝頁仍顯示 v6.7.9：Online / Offline 全部統一為 v6.8.4。
+- EKG OCR 改為 4 路辨識：原圖、上方報告區原色、二值化、窄版高對比。
+- EKG 完報日期以報告本身印出的西元日期為主，再轉換民國年。
+- 例如 `2026/8/17` → `115/08/17`。
+- 加強讀取 HR / PR / QRS / QT / QTc、Sinus rhythm、Ventricular premature complex、Abnormal R-wave progression、Borderline ST elevation、Baseline wander。
 - Online / Offline 完全同步。
-- 保留 v6.8.2 既有功能。
-
-### 本張 EKG 預期摘要
-`115/08/17`
-`• EKG: HR 65 bpm; PR 187 ms; QRS 92 ms; QT 420 ms; QTc 437 ms; Sinus rhythm; Ventricular premature complex; Abnormal R-wave progression, early transition; Borderline ST elevation, anterolateral leads; Baseline wander`
 
 ## GitHub 更新
-將 `online/` 內同名檔案覆蓋到 `clinical-tools`，並重新安裝 Auto Clinical Lab 書籤。
+將 `online/` 內同名檔案直接覆蓋到 `clinical-tools`。
+更新後請刪除舊 Auto Clinical Lab 書籤，再從新版安裝頁重新拖曳一次。
