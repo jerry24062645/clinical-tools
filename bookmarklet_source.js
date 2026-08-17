@@ -1,5 +1,5 @@
 (()=>{
-const ID='__acl644', KEY='__acl685cache';
+const ID='__acl644', KEY='__acl686cache';
 if(document.getElementById(ID)){document.getElementById(ID).remove();return}
 let S={byDate:{},mode:'AUTO'};try{S={...S,...JSON.parse(sessionStorage.getItem(KEY)||'{}')}}catch(e){}
 if(!S.byDate||typeof S.byDate!=='object')S.byDate={};
@@ -683,7 +683,7 @@ function bodyCompDateFromOCR(t){
  if(m)return `${m[1]}/${String(m[2]).padStart(2,'0')}/${String(m[3]).padStart(2,'0')}`;
  return null;
 }
-function storeInBodyOCR(t,extra){
+function storeInBodyOCR(t,extra,explicitDate){
  const z=String(t||'').replace(/\r/g,' ');
  const pats={
   BW:/(?:Weight|Body\s*Weight|體重|\bBW\b)\s*[:：]?\s*(\d{2,3}(?:\.\d+)?)/i,
@@ -696,9 +696,9 @@ function storeInBodyOCR(t,extra){
  const I={};for(const [k,re] of Object.entries(pats)){const m=z.match(re);if(m)I[k]=m[1]}
  if(extra)Object.assign(I,extra);
  if(Object.keys(I).length<2)return false;
- const dte=bodyCompDateFromOCR(z)||reportDateBy(/身體組成分析|InBody|QCheck|BCM-1/i)||Object.keys(S.byDate).sort((a,b)=>dateKey(b)-dateKey(a))[0];
+ const dte=explicitDate||bodyCompDateFromOCR(z)||reportDateBy(/身體組成分析|InBody|QCheck|BCM-1/i)||Object.keys(S.byDate).sort((a,b)=>dateKey(b)-dateKey(a))[0];
  if(!dte)return false;
- Object.assign(ensureDate(dte).inbody,I);save();return true;
+ Object.assign(ensureDate(dte).inbody,I);save();try{if(typeof draw==='function')draw(true)}catch(e){}return true;
 }
 async function cropOCR(T,dataUrl,x0,y0,x1,y1){
  return await new Promise((resolve,reject)=>{
@@ -752,11 +752,11 @@ async function parseQCheckImage(T,dataUrl,fullText){
  }
  // Left "測量結果" column (based on the QCheck Report Summary layout)
  const rows=[
-   ['BW', .205,.210,.305,.238, 25,250],
-   ['PBF',.205,.235,.305,.263,  2,80],
-   ['BFM',.205,.260,.305,.289,  1,120],
-   ['SMM',.205,.310,.305,.339,  5,120],
-   ['BMI',.205,.335,.305,.365, 10,60]
+   ['BW', .215,.214,.292,.235, 25,250],
+   ['PBF',.215,.238,.292,.259,  2,80],
+   ['BFM',.215,.262,.292,.283,  1,120],
+   ['SMM',.215,.298,.292,.320,  5,120],
+   ['BMI',.215,.322,.292,.342, 10,60]
  ];
  for(const [k,x0,y0,x1,y1,lo,hi] of rows){
    const v=await readNum(x0,y0,x1,y1,lo,hi);
@@ -764,20 +764,20 @@ async function parseQCheckImage(T,dataUrl,fullText){
  }
  // BMR kcal: second number in the BMR panel (first large number is kJ).
  try{
-   const a=numsFromOCR(await cropOCR(T,dataUrl,.075,.435,.205,.493));
+   const a=numsFromOCR(await cropOCR(T,dataUrl,.070,.450,.205,.492));
    const kcal=a.find(v=>v>=500&&v<=4000);
    if(kcal!=null)extra.BMR=String(kcal);
  }catch(e){}
  // Visceral fat index: large integer in right-middle panel.
  try{
-   const a=numsFromOCR(await cropOCR(T,dataUrl,.515,.435,.625,.505));
+   const a=numsFromOCR(await cropOCR(T,dataUrl,.520,.438,.620,.492));
    const v=a.find(x=>x>=1&&x<=59);
    if(v!=null)extra.VFA=String(v);
  }catch(e){}
  // Fallback: OCR the whole measurement-result strip and use known row order.
  if(Object.keys(extra).length<5){
    try{
-     const n=numsFromOCR(await cropOCR(T,dataUrl,.205,.205,.305,.405));
+     const n=numsFromOCR(await cropOCR(T,dataUrl,.215,.210,.292,.350));
      if(n.length>=6){
        if(!extra.BW && n[0]>=25&&n[0]<=250)extra.BW=String(n[0]);
        if(!extra.PBF && n[1]>=2&&n[1]<=80)extra.PBF=String(n[1]);
@@ -892,8 +892,8 @@ function dateKey(d){const p=d.split('/').map(Number);return p[0]*10000+p[1]*100+
 function fmt(){
 parseAll();const dates=Object.keys(S.byDate).filter(d=>formatGroup(S.byDate[d]).length).sort((a,b)=>dateKey(b)-dateKey(a));return dates.map(d=>`${d}\n${formatGroup(S.byDate[d]).join('\n')}`).join('\n\n')}
 const d=document.createElement('div');d.id=ID;d.style='position:fixed;z-index:2147483647;right:12px;top:12px;width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;background:#fff;color:#243746;border:1px solid #ccd3db;border-radius:14px;box-shadow:0 12px 40px #0004;padding:14px;font:14px Arial,sans-serif';
-d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.8.5</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。以完報日為唯一日期基準（不使用看診日／診療日／開單日）；新增 CT Abdomen / UACR formula / PSA；離線 Bookmarklet 安裝修正；Urine 僅限尿液檢驗區塊讀取；新增 spot urine chemistry；UACR/UPCR 可由 spot urine 自動計算；新增 KUB；Stool routine；hs-Troponin I/T；Urine routine 細項；C-spine / wrist / elbow / knee / forearm X-ray；Colon fiberscopy；Upper GI panendoscopy；Abdomen + pelvis CT 分類；FBG AC/PC；NT-proBNP；排除生日等非完報日期誤讀；Urine RBC/WBC 僅限尿液檢體；新增腹部超音波；RPR/VDRL；更新尿液檢驗另一套命名格式；檢查清單未點選時保持空白；新增 Echo for Others；下肢/膝/骨盆同份 X-ray 報告合併去重；Windows 截圖改為 HIS 頁面直接 Ctrl+V，不再開啟 screen_capture.html；支援 EKG / InBody 截圖預覽與可用時 OCR；Spot urine 加入 MicroAlbumin；新增頭頸部軟組織超音波；QCheck Report Summary 固定版型截圖可讀取 BW/BMI/PBF/BFM/SMM/VFA；新增 HBsAg / Anti-HBs / Anti-HCV；初報且完報時間空白時亦可讀取；修正 Upper GI 不再誤接至 CT；Colon fiberscopy 加入 Diagnosis / Suggestion。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
-const R=d.querySelector('#aR'),DET=d.querySelector('#aD');function draw(){const t=txt();const det=/\b住院\b/.test(t)?'IPD':/\b門診\b|\b急診\b/.test(t)?'OPD':'?';DET.textContent='Detected: '+det;const view=clinicalView();if(!view){R.textContent='';return}if(view==='REPORT'&&!hasActiveReportBody()){R.textContent='';return}R.textContent=fmt()}
+d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.8.6</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。以完報日為唯一日期基準（不使用看診日／診療日／開單日）；新增 CT Abdomen / UACR formula / PSA；離線 Bookmarklet 安裝修正；Urine 僅限尿液檢驗區塊讀取；新增 spot urine chemistry；UACR/UPCR 可由 spot urine 自動計算；新增 KUB；Stool routine；hs-Troponin I/T；Urine routine 細項；C-spine / wrist / elbow / knee / forearm X-ray；Colon fiberscopy；Upper GI panendoscopy；Abdomen + pelvis CT 分類；FBG AC/PC；NT-proBNP；排除生日等非完報日期誤讀；Urine RBC/WBC 僅限尿液檢體；新增腹部超音波；RPR/VDRL；更新尿液檢驗另一套命名格式；檢查清單未點選時保持空白；新增 Echo for Others；下肢/膝/骨盆同份 X-ray 報告合併去重；Windows 截圖改為 HIS 頁面直接 Ctrl+V，不再開啟 screen_capture.html；支援 EKG / InBody 截圖預覽與可用時 OCR；Spot urine 加入 MicroAlbumin；新增頭頸部軟組織超音波；QCheck Report Summary 固定版型截圖可讀取 BW/BMI/BMR/PBF/BFM/SMM/VFA；截圖 OCR 完成後直接填入 summary；新增 HBsAg / Anti-HBs / Anti-HCV；初報且完報時間空白時亦可讀取；修正 Upper GI 不再誤接至 CT；Colon fiberscopy 加入 Diagnosis / Suggestion。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
+const R=d.querySelector('#aR'),DET=d.querySelector('#aD');function draw(force=false){const t=txt();const det=/\b住院\b/.test(t)?'IPD':/\b門診\b|\b急診\b/.test(t)?'OPD':'?';DET.textContent='Detected: '+det;const view=clinicalView();if(!force){if(!view){R.textContent='';return}if(view==='REPORT'&&!hasActiveReportBody()){R.textContent='';return}}R.textContent=fmt()}
 let tm;const sch=()=>{clearTimeout(tm);tm=setTimeout(draw,250)};addEventListener('scroll',sch,{passive:true});new MutationObserver(sch).observe(document.body,{subtree:true,childList:true,characterData:true});
 const MSG=d.querySelector('#aMsg'),CAP=d.querySelector('#aCap'),IMG=d.querySelector('#aImg');const setMsg=(s,bad=false)=>{MSG.textContent=s;MSG.style.color=bad?'#b42318':'#667085'};const showCapture=dataUrl=>{if(!dataUrl)return;IMG.src=dataUrl;CAP.style.display='block';setMsg('截圖已貼上 ✓')};
 async function ocrCapturedImage(dataUrl){
@@ -921,10 +921,10 @@ async function ocrCapturedImage(dataUrl){
      const o3=await T.recognize(h3,'eng');
      const ecgText=[text,o1?.data?.text||'',o2?.data?.text||'',o3?.data?.text||''].join('\n');
      const reportDate=rocDateFromOCR(ecgText);
-     ok=storeECGText(ecgText,reportDate);label='EKG';if(ok){try{draw()}catch(e){}}
+     ok=storeECGText(ecgText,reportDate);label='EKG';if(ok){try{draw(true)}catch(e){}}
      if(!ok)setMsg('EKG OCR 未辨識到數值，請確認貼入的是完整 12-lead 報告截圖');
    }
-   if(ok){draw();setMsg(`${label} OCR 完成 ✓ 已加入 summary。`)}
+   if(ok){draw(true);setMsg(`${label} OCR 完成 ✓ 已加入 summary。`)}
    else setMsg('截圖已貼上 ✓；未自動辨識到 ECG / InBody 欄位，預覽仍保留。',false);
  }catch(e){
    setMsg('截圖已貼上 ✓；院內網路無法載入 OCR 引擎，因此保留預覽，不會再開啟外部網頁。',false);
