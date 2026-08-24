@@ -3,31 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Auto Clinical Lab — ECG OCR Helper</title>
+<title>Auto Clinical Lab v6.9.2 — Screenshot Helper</title>
 <style>
-body{font-family:Arial,"Microsoft JhengHei",sans-serif;margin:24px;color:#243746;background:#f5f7fa}
-main{max-width:920px;margin:auto;background:#fff;border:1px solid #ccd3db;padding:18px}
-#drop{border:2px dashed #9aa7b5;padding:24px;text-align:center;margin:14px 0;background:#fafcff}
-#preview{max-width:100%;max-height:420px;display:none;border:1px solid #ccd3db}
-#raw{white-space:pre-wrap;font-family:Consolas,monospace;font-size:12px;background:#f7f9fb;padding:10px;display:none}
+body{font-family:Arial,"Microsoft JhengHei",sans-serif;margin:0;background:#f5f7fa;color:#243746}
+main{max-width:860px;margin:42px auto;background:#fff;border:1px solid #ccd3db;border-radius:16px;padding:28px}
+h2{margin-top:0} .box{background:#f8fafc;border:1px solid #d9e0e7;border-radius:12px;padding:18px;line-height:1.7}
+code{background:#eef2f6;padding:2px 5px;border-radius:5px}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 <main>
-<h3>ECG OCR Helper</h3>
-<p>1. 按 <b>Win + Shift + S</b> 擷取 ECG。 2. 回到此頁按 <b>Ctrl + V</b>。 3. 完成後會自動回傳 Auto Clinical Lab。</p>
-<div id="drop">請在這裡 Ctrl + V 貼上 ECG 截圖</div>
-<div id="msg">等待截圖…</div>
-<img id="preview" alt="ECG preview">
-<pre id="raw"></pre>
+<h2>Auto Clinical Lab v6.9.2</h2>
+<div class="box">
+<p><b>EKG / InBody 截圖請直接貼回 HIS 頁面的 Auto Clinical Lab 視窗。</b></p>
+<p>操作：按 <b>Win + Shift + S</b> 擷取 → 回到 <code>192.168...</code> HIS → 點 Auto Clinical Lab → 按 <b>Ctrl + V</b>。</p>
+<p>新版已在主 Bookmarklet 內直接完成 OCR、日期解析與 summary 更新，不再使用舊的 <code>window.opener.postMessage()</code> 回傳流程。</p>
+<p>此頁僅保留作為相容導引，避免舊書籤或舊連結開啟後出現無法連線或 OCR 回傳失敗。</p>
+</div>
 </main>
-<script>
-const msg=document.getElementById('msg'),preview=document.getElementById('preview'),raw=document.getElementById('raw');
-function setMsg(x,bad=false){msg.textContent=x;msg.style.color=bad?'#b42318':'#243746'}
-async function preprocess(dataUrl){return await new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>{try{const cropH=Math.max(220,Math.floor(im.height*0.34)),scale=2,c=document.createElement('canvas');c.width=im.width*scale;c.height=cropH*scale;const x=c.getContext('2d');x.drawImage(im,0,0,im.width,cropH,0,0,c.width,c.height);const id=x.getImageData(0,0,c.width,c.height),p=id.data;for(let i=0;i<p.length;i+=4){let y=.299*p[i]+.587*p[i+1]+.114*p[i+2];y=y<180?0:255;p[i]=p[i+1]=p[i+2]=y}x.putImageData(id,0,0);resolve(c)}catch(e){reject(e)}};im.onerror=reject;im.src=dataUrl})}
-async function run(dataUrl){preview.src=dataUrl;preview.style.display='block';try{if(!window.Tesseract?.recognize)throw new Error('OCR engine 無法載入');setMsg('ECG OCR 讀取中…');const c=await preprocess(dataUrl);const out=await Tesseract.recognize(c,'eng',{logger:m=>{if(m?.status==='recognizing text')setMsg(`ECG OCR ${Math.round((m.progress||0)*100)}%…`)}});const text=out?.data?.text||'';raw.textContent=text;raw.style.display='block';if(!text.trim())throw new Error('未辨識到文字');if(window.opener&&!window.opener.closed){window.opener.postMessage({type:'ACL_ECG_OCR_TEXT',text},'*');setMsg('ECG OCR 完成 ✓ 已回傳 Auto Clinical Lab。');}else setMsg('ECG OCR 完成，但原 HIS 視窗已關閉。',true)}catch(e){setMsg('ECG OCR 失敗：'+(e?.message||e),true)}}
-addEventListener('paste',ev=>{const it=[...(ev.clipboardData?.items||[])].find(x=>x.type?.startsWith('image/'));if(!it)return;ev.preventDefault();const f=it.getAsFile();const r=new FileReader();r.onload=()=>run(r.result);r.readAsDataURL(f)},true);
-</script>
 </body>
 </html>

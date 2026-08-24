@@ -1,37 +1,36 @@
-# Auto Clinical Lab v6.9.1
+# Auto Clinical Lab v6.9.2
 
-## 新增判讀
+## 本版重點
 - Ferritin
-  - 例如：`Ferritin H 563 ng/mL`
 - Reticulocyte count
-  - 例如：`Reticulocyte 0.82%`
-
-## EKG / InBody OCR 閃退修正
-問題原因是 OCR 完成後，預覽圖片與狀態文字的 DOM 變化會再次觸發 MutationObserver。
-舊版接著用一般模式重新 draw，在「目前沒有 active HIS report body」時會把 summary 清空，因此會出現「結果閃一下就消失」。
-
-v6.9.1 修正：
-- OCR 成功後將結果設為 `OCR_PIN`。
-- OCR 結果會持續保留在 summary 灰框，直到 Clear cache 或關閉視窗。
-- MutationObserver 忽略 Auto Clinical Lab 自己視窗內的 DOM 變化。
-- Scroll / HIS 頁面其他變動時，只會重新渲染已釘選的 OCR summary，不會清空。
-- OCR 完成後可直接按 Copy。
-
-## 保留既有功能
 - Total protein / A-G ratio
-- Cockcroft-Gault CrCl（Age/Sex 自動抓取、BW 手動輸入，CrCl 接在 eGFR 後）
-- SI / TIBC / UIBC / SI-TIBC(%)
-- Folic acid / Vitamin B12 / CPK
-- Chlamydia pneumoniae IgM
-- Legionella / Pneumococcus urine antigen
-- Mycoplasma IgG / IgM Rapid Test
-- EKG / InBody-QCheck OCR 與既有 Lab / imaging / endoscopy 判讀
+- Cockcroft-Gault CrCl
+- EKG / InBody-QCheck OCR summary 固定保留，不再閃退
+
+## screen_capture.html 同步修正
+舊版 `screen_capture.html` 會：
+- 自己載入 Tesseract
+- OCR ECG
+- 再用 `window.opener.postMessage()` 把文字送回 Auto Clinical Lab
+
+v6.9.2 改為：
+- EKG / InBody 截圖直接在 HIS 頁面的 Auto Clinical Lab 視窗按 Ctrl+V
+- OCR、日期解析、summary 更新全部由主 Bookmarklet 處理
+- `screen_capture.html` 僅保留為相容導引頁
+- 不再依賴 `window.opener`
+- 避免舊 helper 造成 OCR 回傳失敗、無法連線或 summary 狀態不同步
 
 ## 完整同步
-- GitHub `index.html`
-- Bookmarklet 安裝頁
-- Bookmarklet source
-- Online / Offline
-- README
+以下全部同步為 v6.9.2：
+- online/bookmarklet_source.js
+- offline/bookmarklet_source.js
+- online/emr_lab_bookmarklet.html
+- offline/emr_lab_bookmarklet.html
+- online/index.html
+- online/screen_capture.html
+- offline/screen_capture.html
+- README.md
 
-全部同步為 v6.9.1。
+## GitHub 更新
+請將 `online/` 內所有同名檔案完整覆蓋到 `clinical-tools`。
+更新後刪除瀏覽器舊 Auto Clinical Lab 書籤，再由新版安裝頁重新拖曳。
