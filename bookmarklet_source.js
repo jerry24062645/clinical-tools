@@ -1,5 +1,5 @@
 (()=>{
-const ID='__acl644', KEY='__acl698cache';
+const ID='__acl644', KEY='__acl699cache';
 if(document.getElementById(ID)){document.getElementById(ID).remove();return}
 let S={byDate:{},mode:'AUTO'};try{S={...S,...JSON.parse(sessionStorage.getItem(KEY)||'{}')}}catch(e){}
 if(!S.byDate||typeof S.byDate!=='object')S.byDate={};
@@ -454,7 +454,10 @@ function parseHbElectrophoresisComments(){
 }
 function parseSpecialText(){
  let changed=false;
- try{const all=txt(), bm=all.match(/血型\s*([ABO]{1,2})\s*([+-])/i);if(bm){const ds=(all.match(/1\d{2}\/\d{2}\/\d{2}/g)||[]);if(ds.length){ensureDate(ds[0]).special.bloodType=(bm[1].toUpperCase()+bm[2]);changed=true}}}catch(e){}
+ try{
+   const all=txt(), bm=all.match(/(?:^|\s)血型\s*([ABO]{1,2})\s*([+-])(?:\s|$)/im);
+   if(bm){S.demographicBloodType=(bm[1].toUpperCase()+bm[2]);changed=true}
+ }catch(e){}
  // ABO grouping from laboratory rows; do not infer Rh(D) when it is absent.
  for(const r of rows()){const d=rowDate(r);if(!d)continue;for(let i=0;i<r.length;i++){if(/A\.?B\.?A\.?B\.?O\.?\s*blood\s*(?:grouping|gouping)|血型鑑定/i.test(r[i])){for(let j=i+1;j<r.length;j++){const z=clean(r[j]).toUpperCase();if(/^(?:A|B|AB|O)$/.test(z)){ensureDate(d).special.bloodType=z;changed=true;break}}}}}
  for(const r of rows()){
@@ -509,6 +512,15 @@ function parseVascular(t){
 
 
 let ACL_CRCL_BW=null;
+function hasDatedBloodType(){
+ try{return Object.values(S.byDate||{}).some(g=>g?.special?.bloodType)}catch(e){return false}
+}
+function headerBloodType(){
+ try{
+   if(hasDatedBloodType())return '';
+   return S.demographicBloodType||'';
+ }catch(e){return ''}
+}
 function patientAgeSex(){
  const z=String(document.body?.innerText||'').replace(/\r/g,' ');
  let age=null,sex=null,m;
@@ -1051,8 +1063,11 @@ function dateKey(d){const p=d.split('/').map(Number);return p[0]*10000+p[1]*100+
 function fmt(){
 parseAll();const dates=Object.keys(S.byDate).filter(d=>formatGroup(S.byDate[d]).length).sort((a,b)=>dateKey(b)-dateKey(a));return dates.map(d=>`${d}\n${formatGroup(S.byDate[d]).join('\n')}`).join('\n\n')}
 const d=document.createElement('div');d.id=ID;d.style='position:fixed;z-index:2147483647;right:12px;top:12px;width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;background:#fff;color:#243746;border:1px solid #ccd3db;border-radius:14px;box-shadow:0 12px 40px #0004;padding:14px;font:14px Arial,sans-serif';
-d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.9.8</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span><div style="margin-top:7px">Cockcroft-Gault BW <input id=aBW type=number min=1 step=0.1 placeholder="kg" style="width:76px;padding:2px 4px"> kg <span id=aAS style="margin-left:8px;color:#667085"></span></div></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。以完報日為唯一日期基準（不使用看診日／診療日／開單日）；新增 CT Abdomen / UACR formula / PSA；離線 Bookmarklet 安裝修正；Urine 僅限尿液檢驗區塊讀取；新增 spot urine chemistry；UACR/UPCR 可由 spot urine 自動計算；新增 KUB；Stool routine；hs-Troponin I/T；Urine routine 細項；C-spine / wrist / elbow / knee / forearm X-ray；Colon fiberscopy；Upper GI panendoscopy；Abdomen + pelvis CT 分類；FBG AC/PC；NT-proBNP；排除生日等非完報日期誤讀；Urine RBC/WBC 僅限尿液檢體；新增腹部超音波；RPR/VDRL；更新尿液檢驗另一套命名格式；檢查清單未點選時保持空白；新增 Echo for Others；下肢/膝/骨盆同份 X-ray 報告合併去重；Windows 截圖改為 HIS 頁面直接 Ctrl+V，不再開啟 screen_capture.html；支援 EKG / InBody 截圖預覽與可用時 OCR；Spot urine 加入 MicroAlbumin；新增頭頸部軟組織超音波；QCheck Report Summary 固定版型截圖可讀取 BW/BMI/BMR/PBF/BFM/SMM/VFA；截圖 OCR 完成後直接填入 summary；新增 HBsAg / Anti-HBs / Anti-HCV；初報且完報時間空白時亦可讀取；修正 Upper GI 不再誤接至 CT；Colon fiberscopy 加入 Diagnosis / Suggestion；新增 SI/TIBC/UIBC 與 SI/TIBC(%)、Folic acid、Vit B12、CPK、Chlamydia pneumoniae IgM、Legionella/Pneumococcus urine Ag、Mycoplasma IgG/IgM Rapid Test；新增 Total protein、A/G ratio、Cockcroft-Gault CrCl（Age/Sex 自動、BW 手動）；新增 Ferritin、Reticulocyte count；修正 EKG/InBody OCR summary 閃退；screen_capture.html 改為相容導引頁，不再依賴 window.opener OCR 回傳；新增 Estradiol(E2)、FSH、Hb electrophoresis、Urine Protein 判讀；新增婦科／陰道超音波判讀（Uterus/IUGS/GS/yolk sac/fetal pole/CRL/FHB/Impression）；新增 CA19-9/CA125/CEA、Pregnancy test、Blood type、PTH-i；同日自動計算 Corrected Ca 與 calculated serum Osm；新增 75 g OGTT 2h、HIV Ag/Ab Combo、RPR/VDRL 補強、ABO blood grouping（未提供 Rh 時不推論 Rh）；Urine routine 與 CBC 名稱辨識補強。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
-const R=d.querySelector('#aR'),DET=d.querySelector('#aD'),BW=d.querySelector('#aBW'),AS=d.querySelector('#aAS');let OCR_PIN=false;function draw(force=false){const t=txt();const det=/\b住院\b/.test(t)?'IPD':/\b門診\b|\b急診\b/.test(t)?'OPD':'?';DET.textContent='Detected: '+det;try{const q=patientAgeSex();AS.textContent=`${q.age!=null?'Age '+q.age:'Age ?'} / ${q.sex==='female'?'Female':q.sex==='male'?'Male':'Sex ?'}`}catch(e){}const view=clinicalView();if(!(force||OCR_PIN)){if(!view){R.textContent='';return}if(view==='REPORT'&&!hasActiveReportBody()){R.textContent='';return}}R.textContent=fmt()}
+d.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Auto Clinical Lab v6.9.9</b><button id=aX>×</button></div><div style="margin:8px 0;font-size:12px">Mode <select id=aM><option>AUTO</option><option>OPD</option><option>IPD</option></select> <span id=aD></span><div style="margin-top:7px">Cockcroft-Gault BW <input id=aBW type=number min=1 step=0.1 placeholder="kg" style="width:76px;padding:2px 4px"> kg <span id=aAS style="margin-left:8px;color:#667085"></span></div></div><pre id=aR style="white-space:pre-wrap;background:#f7f9fb;padding:10px;border-radius:9px;min-height:50px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button id=aC>Copy</button><button id=aK>Clear cache</button><button id=aS>Windows 剪取工具</button></div><div id=aMsg style="font-size:11px;color:#667085;margin-top:8px">依完報日累積：不同日期不覆蓋；同日同項目去重。以完報日為唯一日期基準（不使用看診日／診療日／開單日）；新增 CT Abdomen / UACR formula / PSA；離線 Bookmarklet 安裝修正；Urine 僅限尿液檢驗區塊讀取；新增 spot urine chemistry；UACR/UPCR 可由 spot urine 自動計算；新增 KUB；Stool routine；hs-Troponin I/T；Urine routine 細項；C-spine / wrist / elbow / knee / forearm X-ray；Colon fiberscopy；Upper GI panendoscopy；Abdomen + pelvis CT 分類；FBG AC/PC；NT-proBNP；排除生日等非完報日期誤讀；Urine RBC/WBC 僅限尿液檢體；新增腹部超音波；RPR/VDRL；更新尿液檢驗另一套命名格式；檢查清單未點選時保持空白；新增 Echo for Others；下肢/膝/骨盆同份 X-ray 報告合併去重；Windows 截圖改為 HIS 頁面直接 Ctrl+V，不再開啟 screen_capture.html；支援 EKG / InBody 截圖預覽與可用時 OCR；Spot urine 加入 MicroAlbumin；新增頭頸部軟組織超音波；QCheck Report Summary 固定版型截圖可讀取 BW/BMI/BMR/PBF/BFM/SMM/VFA；截圖 OCR 完成後直接填入 summary；新增 HBsAg / Anti-HBs / Anti-HCV；初報且完報時間空白時亦可讀取；修正 Upper GI 不再誤接至 CT；Colon fiberscopy 加入 Diagnosis / Suggestion；新增 SI/TIBC/UIBC 與 SI/TIBC(%)、Folic acid、Vit B12、CPK、Chlamydia pneumoniae IgM、Legionella/Pneumococcus urine Ag、Mycoplasma IgG/IgM Rapid Test；新增 Total protein、A/G ratio、Cockcroft-Gault CrCl（Age/Sex 自動、BW 手動）；新增 Ferritin、Reticulocyte count；修正 EKG/InBody OCR summary 閃退；screen_capture.html 改為相容導引頁，不再依賴 window.opener OCR 回傳；新增 Estradiol(E2)、FSH、Hb electrophoresis、Urine Protein 判讀；新增婦科／陰道超音波判讀（Uterus/IUGS/GS/yolk sac/fetal pole/CRL/FHB/Impression）；新增 CA19-9/CA125/CEA、Pregnancy test、Blood type、PTH-i；同日自動計算 Corrected Ca 與 calculated serum Osm；新增 75 g OGTT 2h、HIV Ag/Ab Combo、RPR/VDRL 補強、ABO blood grouping（未提供 Rh 時不推論 Rh）；Urine routine 與 CBC 名稱辨識補強。</div><div id=aCap style="display:none;margin-top:8px"><img id=aImg alt="Captured screen" style="max-width:100%;max-height:220px;border:1px solid #ccd3db;border-radius:8px"></div>`;document.body.appendChild(d);
+const R=d.querySelector('#aR'),DET=d.querySelector('#aD'),BW=d.querySelector('#aBW'),AS=d.querySelector('#aAS');let OCR_PIN=false;function draw(force=false){const t=txt();const det=/\b住院\b/.test(t)?'IPD':/\b門診\b|\b急診\b/.test(t)?'OPD':'?';DET.textContent='Detected: '+det;try{
+ const q=patientAgeSex(),bt=headerBloodType();
+ AS.textContent=`${q.age!=null?'Age '+q.age:'Age ?'} / ${q.sex==='female'?'Female':q.sex==='male'?'Male':'Sex ?'}${bt?' / '+bt:''}`;
+}catch(e){}const view=clinicalView();if(!(force||OCR_PIN)){if(!view){R.textContent='';return}if(view==='REPORT'&&!hasActiveReportBody()){R.textContent='';return}}R.textContent=fmt()}
 let tm;const sch=()=>{clearTimeout(tm);tm=setTimeout(()=>draw(OCR_PIN),250)};addEventListener('scroll',sch,{passive:true});new MutationObserver(ms=>{if(ms.some(m=>!d.contains(m.target)))sch()}).observe(document.body,{subtree:true,childList:true,characterData:true});
 const MSG=d.querySelector('#aMsg'),CAP=d.querySelector('#aCap'),IMG=d.querySelector('#aImg');const setMsg=(s,bad=false)=>{MSG.textContent=s;MSG.style.color=bad?'#b42318':'#667085'};const showCapture=dataUrl=>{if(!dataUrl)return;IMG.src=dataUrl;CAP.style.display='block';setMsg('截圖已貼上 ✓')};
 async function ocrCapturedImage(dataUrl){
